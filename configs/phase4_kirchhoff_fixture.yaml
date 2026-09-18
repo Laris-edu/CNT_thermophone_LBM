@@ -1,0 +1,46 @@
+# P4-4 Kirchhoff 2D kernel manufactured-fixture configuration (contract section 9).
+# Pure Helmholtz fixtures -- no LBM. Air-flavoured scales (10 kHz, c0=347) so the numbers read
+# like the project's working point, but the fixtures are scale-free. Gates are the contract's
+# kernel-level thresholds (amplitude < 2%, phase < 2 deg); they bind the KERNEL only (the M4
+# end-to-end gate stays <10%).
+case:
+  name: phase4_kirchhoff_fixture
+  phase: Phase_4
+  purpose: P4-4 manufactured fixtures anchoring the 2D Kirchhoff kernel Green convention/prefactor
+
+physical:
+  c0_m_s: 347.0
+  rho0_kg_m3: 1.177
+  frequency_Hz: 1.0e4
+
+# Control line y=0, normal +e_y (into the observation domain), uniform sampling.
+surface:
+  aperture_wavelengths: 600     # total width L = 600 lambda (plane-wave arm needs the margin)
+  samples_per_wavelength: 12
+
+# Manufactured outgoing cylindrical source below the line (fixture 1/2/4).
+cylindrical_source:
+  depth_wavelengths: 10         # source at (0, -10 lambda)
+  amplitude_Pa: 1.0
+
+# Observers above the line (x, y) in wavelengths; on-axis + off-axis within the valid cone.
+observers_wavelengths:
+  - [0.0, 20.0]
+  - [0.0, 30.0]
+  - [0.0, 100.0]
+  - [20.0, 60.0]
+  - [-20.0, 60.0]
+
+# Plane-wave phase-convention fixture (fixture 3): outgoing plane wave fed via the VELOCITY
+# channel (dp/dn = -i Omega rho0 v_n), observer on-axis.
+plane_wave:
+  amplitude_Pa: 2.0
+  observer_height_wavelengths: 20.0
+
+# Discrete-convergence fixture (fixture 2): coarser samplings that must show decreasing error.
+convergence_samples_per_wavelength: [1.5, 3, 6, 12]
+
+gates:
+  amplitude_rel_max: 0.02       # contract: manufactured Kirchhoff amplitude error < 2%
+  phase_deg_max: 2.0            # contract: manufactured Kirchhoff phase error < 2 deg
+  counterexample_min_error: 0.5 # wrong-time-convention kernel must fail by O(1)

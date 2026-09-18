@@ -1,0 +1,769 @@
+{
+  "date": "2026-09-17",
+  "source_repo": "E:/JFM2024",
+  "target_repo": "E:/CNT_thermophone_LBM",
+  "python": "3.14.2",
+  "method": "按“功率→膜温→热流→复声压”链路闭包机械复制，随后对 core 与两个测试文件做裁剪；两个基线 YAML 逐字节保留",
+  "equivalence_check": {
+    "scope": "local 基线与 analytic_stress(frozen) 两组配置, nx=64/ny=8, 200 步",
+    "result": "两仓 f/g 数组 SHA256 与宏观总和、tau 完全一致（逐位等价）",
+    "old_repo": {
+      "local": "f=57e1dfad5748bd89 g=5f51c9c90ac96a83",
+      "frozen": "f=13df47b43d57f511 g=1236e0f6f4c200f7"
+    },
+    "new_repo": {
+      "local": "f=57e1dfad5748bd89 g=5f51c9c90ac96a83",
+      "frozen": "f=13df47b43d57f511 g=1236e0f6f4c200f7"
+    },
+    "test_suite_old": "93 passed, 1 xfailed",
+    "test_suite_new": "92 passed"
+  },
+  "files": [
+    {
+      "new_path": ".gitignore",
+      "sha256": "fb5dfe7b5f5dc772a89c6b9800cf2c3e9712a6c195bd16095dd8af610f440957",
+      "lines": 8,
+      "source_path": "E:/JFM2024/.gitignore",
+      "source_sha256": "fb5dfe7b5f5dc772a89c6b9800cf2c3e9712a6c195bd16095dd8af610f440957",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": ".python-version",
+      "sha256": "ca2e220d1fb92b2610d4b4dd20bde54d8d258f3e5ce89b8365612ffd415171ee",
+      "lines": 1,
+      "source_path": "E:/JFM2024/.python-version",
+      "source_sha256": "ca2e220d1fb92b2610d4b4dd20bde54d8d258f3e5ce89b8365612ffd415171ee",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": ".vscode/settings.json",
+      "sha256": "490dd06a748b6a962aa6488fb07cc8c1b1c30d36be76c71cd04670b762eb73f3",
+      "lines": 8,
+      "source_path": "E:/JFM2024/.vscode/settings.json",
+      "source_sha256": "490dd06a748b6a962aa6488fb07cc8c1b1c30d36be76c71cd04670b762eb73f3",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "README.md",
+      "sha256": "a92a46e880c0a0c81e5f520be577515fb264442d95a56c0a4d3d86d2923fcf8b",
+      "lines": 61,
+      "origin": "rewritten",
+      "source_path": null
+    },
+    {
+      "new_path": "boundary/README.md",
+      "sha256": "2fd4ded625531c0da87ffedccd51bdc958e5b2b7824815d067a1b2ed8af97588",
+      "lines": 12,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "boundary/__init__.py",
+      "sha256": "ba89e31b92381e4f8ae751b45d97321bf5b8624cbeb1eb3da32dc1de10504379",
+      "lines": 1,
+      "source_path": "E:/JFM2024/boundary/__init__.py",
+      "source_sha256": "ba89e31b92381e4f8ae751b45d97321bf5b8624cbeb1eb3da32dc1de10504379",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "boundary/wall_common.py",
+      "sha256": "daf9537310602465d2efce6c63eea1d261a4aad3dc1e17719868577807853a83",
+      "lines": 63,
+      "source_path": "E:/JFM2024/boundary/wall_common.py",
+      "source_sha256": "daf9537310602465d2efce6c63eea1d261a4aad3dc1e17719868577807853a83",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "boundary/wall_dirichlet.py",
+      "sha256": "b0bffb0cb40d4a3c7980b72e56e42ba429a11947f10eaf1ae5033209ae890bcc",
+      "lines": 198,
+      "source_path": "E:/JFM2024/boundary/wall_dirichlet.py",
+      "source_sha256": "b0bffb0cb40d4a3c7980b72e56e42ba429a11947f10eaf1ae5033209ae890bcc",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "boundary/wall_thermal_grad.py",
+      "sha256": "63cfcf63c48cc6a2d88ae4a75b4661e3ac2d0621729c299d61db22c6ca94af5c",
+      "lines": 207,
+      "source_path": "E:/JFM2024/boundary/wall_thermal_grad.py",
+      "source_sha256": "63cfcf63c48cc6a2d88ae4a75b4661e3ac2d0621729c299d61db22c6ca94af5c",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "boundary/wall_thermal_mass_neutral.py",
+      "sha256": "d86c357573e1cd30c82e39b0c2120b5348db6139112c120640f6f549e94be521",
+      "lines": 349,
+      "source_path": "E:/JFM2024/boundary/wall_thermal_mass_neutral.py",
+      "source_sha256": "7b887786134c4039a138635176c90b225d551b9c5af4a717a0dfa3a17ff7ba19",
+      "origin": "edited",
+      "note": "仅修正指向未迁入模块的 docstring 引用"
+    },
+    {
+      "new_path": "config_io.py",
+      "sha256": "bcaef144121eb8cb849301a30fc39e4085eae06a592fa1664e42f832d62d5fba",
+      "lines": 15,
+      "source_path": "E:/JFM2024/config_io.py",
+      "source_sha256": "bcaef144121eb8cb849301a30fc39e4085eae06a592fa1664e42f832d62d5fba",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "configs/README.md",
+      "sha256": "f308221f67cf26219bcf4f9bb04d8d47dde494f04ccba5144bc1bb8a08619c2d",
+      "lines": 13,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "configs/gas_air_10k_d2q37_qmatched_analytic_stress.yaml",
+      "sha256": "591e6c04f564f5044fe0a3b4a89dcfd89285992594b9700655486d95804effcf",
+      "lines": 178,
+      "source_path": "E:/JFM2024/configs/gas_air_10k_d2q37_qmatched_analytic_stress.yaml",
+      "source_sha256": "591e6c04f564f5044fe0a3b4a89dcfd89285992594b9700655486d95804effcf",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "configs/gas_air_10k_d2q37_qmatched_local_transport.yaml",
+      "sha256": "934328a008ed69642bd3db05a9521382058cd11d0e6d79b5e655b4ed70481634",
+      "lines": 58,
+      "source_path": "E:/JFM2024/configs/gas_air_10k_d2q37_qmatched_local_transport.yaml",
+      "source_sha256": "934328a008ed69642bd3db05a9521382058cd11d0e6d79b5e655b4ed70481634",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "configs/phase4_kirchhoff_fixture.yaml",
+      "sha256": "9db77a811f359a38c81fa962bc437d075021b549f629abffe0a795c8964e3eb8",
+      "lines": 46,
+      "source_path": "E:/JFM2024/configs/phase4_kirchhoff_fixture.yaml",
+      "source_sha256": "9db77a811f359a38c81fa962bc437d075021b549f629abffe0a795c8964e3eb8",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "core/README.md",
+      "sha256": "7cfcaa485d46b3a60b9fa23119e384660bc245fdd52f97b83a6f1f5f8813d821",
+      "lines": 15,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "core/__init__.py",
+      "sha256": "a4f2d0ea02c665e2b4e5419f9db825d42b2f82838f7e0b1a487e8fedb32e46ab",
+      "lines": 16,
+      "source_path": "E:/JFM2024/core/__init__.py",
+      "source_sha256": "2f37c003f213037951f9b10c4197d216016957d6773dabe98df7d22934de06c5",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/collision_smrt.py",
+      "sha256": "4909cabb3e2d50097a2c5ae5d33d4d430d86a9a72cab4da193521dac4e0affa0",
+      "lines": 397,
+      "source_path": "E:/JFM2024/core/collision_smrt.py",
+      "source_sha256": "b47020d7fc34f7b4e04aab09208cba001cc5d6eb32c4f09b6e612ae299b2edff",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/equilibrium.py",
+      "sha256": "01cd30508c47d619205e5cc3d8196520e0537b8fa7328f4e9990a46781f91f30",
+      "lines": 139,
+      "source_path": "E:/JFM2024/core/equilibrium.py",
+      "source_sha256": "4e1805cc9fcab14bdacdd256cc1a85457c26578c33366feb26398e145473a279",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/lattice.py",
+      "sha256": "b419d417d25f2d82eec93c7838b15d7e56d5cd26506e22110f1a5a61c922b51b",
+      "lines": 63,
+      "source_path": "E:/JFM2024/core/lattice.py",
+      "source_sha256": "40277943ab02b0240ddf478371d28c85b371c2d1776d1f184e3a4cb1b450cd2c",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/lattice_d2q37.py",
+      "sha256": "7d0d1a6defca9c997d3e7a53ac1a4a627588519336ddf9bfe52b684da8e57509",
+      "lines": 112,
+      "source_path": "E:/JFM2024/core/lattice_d2q37.py",
+      "source_sha256": "1fe97d76758e2d60a2a11e1fc87ec88f2f9dc960d39634485be5f226ee0687e6",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/macroscopic.py",
+      "sha256": "e9c9831951304b60bfcf207219eb2115b50f77dffbde599dbcbf14e51c763f11",
+      "lines": 148,
+      "source_path": "E:/JFM2024/core/macroscopic.py",
+      "source_sha256": "984554eaab0daa243ca52a3c4a0163d267bb010c804424aff829918966c16448",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/solver.py",
+      "sha256": "a30c0be68651644b2fa88ad8df7dc3e1c897281d5f100a078df6e7f4d505a8e9",
+      "lines": 234,
+      "source_path": "E:/JFM2024/core/solver.py",
+      "source_sha256": "b7d8e335eb1b251f8816d6eec24b83b5df837e2695261ce1ae9cca59ed398f10",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "core/streaming.py",
+      "sha256": "cd75008bf7ea71ff11c943c02396b4606e68189995afb8704da1b05f99b2ea4a",
+      "lines": 51,
+      "source_path": "E:/JFM2024/core/streaming.py",
+      "source_sha256": "cd75008bf7ea71ff11c943c02396b4606e68189995afb8704da1b05f99b2ea4a",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "core/unit_mapping.py",
+      "sha256": "cd43d6d866648bf3bfad22418fd0b9cbd3fd867cbe53e7cfe032a3e5b50bb5a2",
+      "lines": 545,
+      "source_path": "E:/JFM2024/core/unit_mapping.py",
+      "source_sha256": "730f02991dc848361e2505f73126e96f03435b231d729c67366c8f17dabf1ab7",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "coupling/README.md",
+      "sha256": "ee3de4d8da627b146d6a4db4d90ae21eac9a8a37e89a97b153ebfa2d6d560685",
+      "lines": 13,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "coupling/__init__.py",
+      "sha256": "57523b72ed4e37296a9186e995915a2346d232de6d7692439165a4c33d40249b",
+      "lines": 47,
+      "source_path": "E:/JFM2024/coupling/__init__.py",
+      "source_sha256": "57523b72ed4e37296a9186e995915a2346d232de6d7692439165a4c33d40249b",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "coupling/conjugate.py",
+      "sha256": "23a3c9c86edf32bd53ec0a8690928a4ac3ad22488e33c85e9eab7087f1c4df91",
+      "lines": 512,
+      "source_path": "E:/JFM2024/coupling/conjugate.py",
+      "source_sha256": "23a3c9c86edf32bd53ec0a8690928a4ac3ad22488e33c85e9eab7087f1c4df91",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "coupling/conservative.py",
+      "sha256": "a4b4718c4c6ac0ea7c6c199c305c4b05694c19030d832140d50e6cb1acbaa047",
+      "lines": 128,
+      "source_path": "E:/JFM2024/coupling/conservative.py",
+      "source_sha256": "a4b4718c4c6ac0ea7c6c199c305c4b05694c19030d832140d50e6cb1acbaa047",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "coupling/drive.py",
+      "sha256": "f329753ccd11b546ddb36e17b9d555b399c750b572d2eef6902157393684f934",
+      "lines": 95,
+      "source_path": "E:/JFM2024/coupling/drive.py",
+      "source_sha256": "f329753ccd11b546ddb36e17b9d555b399c750b572d2eef6902157393684f934",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "coupling/energy_audit.py",
+      "sha256": "cba36ffc34276f3b506667e6af01284518ead887efcf83e561c505502a45a57c",
+      "lines": 102,
+      "source_path": "E:/JFM2024/coupling/energy_audit.py",
+      "source_sha256": "cba36ffc34276f3b506667e6af01284518ead887efcf83e561c505502a45a57c",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "coupling/film_ode.py",
+      "sha256": "f2f168ba03ed27526bf2a41d02a16a8eccdef00d13427e6a7b5591cda42b8a6d",
+      "lines": 426,
+      "source_path": "E:/JFM2024/coupling/film_ode.py",
+      "source_sha256": "f2f168ba03ed27526bf2a41d02a16a8eccdef00d13427e6a7b5591cda42b8a6d",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "docs/CHAIN.md",
+      "sha256": "e9dc1f0ab899526e6e43570a551e4ca0694ce3c3f7759a6b2b971a5e0699c086",
+      "lines": 42,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "docs/PROVENANCE.md",
+      "origin": "new",
+      "source_path": null,
+      "sha256": "37e1c0b7044b1b8ea93e61265dcbfdbc55514411af39e8d61dcbfbf0b988c9e5",
+      "lines": 61
+    },
+    {
+      "new_path": "docs/migration_manifest.json",
+      "sha256": null,
+      "lines": 769,
+      "origin": "new",
+      "source_path": null,
+      "note": "本文件自身哈希随每次生成变化，故不记录；其余条目哈希为该次生成时的值"
+    },
+    {
+      "new_path": "farfield/README.md",
+      "sha256": "c6c4b8d23cec230a64fe620d88b491f112f3281d16287fb134b11405a45d310c",
+      "lines": 10,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "farfield/__init__.py",
+      "sha256": "5d7fbf6cd2223b9461ffc1c9a3fc5883649de89c5f072cd072ce3fbbaa15ee96",
+      "lines": 1,
+      "source_path": "E:/JFM2024/farfield/__init__.py",
+      "source_sha256": "5d7fbf6cd2223b9461ffc1c9a3fc5883649de89c5f072cd072ce3fbbaa15ee96",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "farfield/compact_source.py",
+      "sha256": "04ac0f56e508f26a9d32012b53297b52c26de371947a5d022fe7a8392f5752dd",
+      "lines": 106,
+      "source_path": "E:/JFM2024/farfield/compact_source.py",
+      "source_sha256": "04ac0f56e508f26a9d32012b53297b52c26de371947a5d022fe7a8392f5752dd",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "farfield/kirchhoff_2d.py",
+      "sha256": "3ddae74886d4f1330b789b21ae924ac5e086220c80a3d27008012be50b786bd7",
+      "lines": 128,
+      "source_path": "E:/JFM2024/farfield/kirchhoff_2d.py",
+      "source_sha256": "3ddae74886d4f1330b789b21ae924ac5e086220c80a3d27008012be50b786bd7",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "phase3_interfaces/README.md",
+      "sha256": "fdea12f2c21687e697237dd1812f5e861453ddacc05e2bb6292e24f557c6db09",
+      "lines": 11,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "phase3_interfaces/__init__.py",
+      "sha256": "9662dc6e81ea21009f62a8f6fcee999f6f32a5368bbf50bd93f694ecdbcaca98",
+      "lines": 2,
+      "source_path": "E:/JFM2024/phase3_interfaces/__init__.py",
+      "source_sha256": "9662dc6e81ea21009f62a8f6fcee999f6f32a5368bbf50bd93f694ecdbcaca98",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "phase3_interfaces/complex_amplitude.py",
+      "sha256": "3d4f54c007504ea995fa2d55d32b5dd0518c49f392cd1136e8e813086f25a708",
+      "lines": 27,
+      "source_path": "E:/JFM2024/phase3_interfaces/complex_amplitude.py",
+      "source_sha256": "3d4f54c007504ea995fa2d55d32b5dd0518c49f392cd1136e8e813086f25a708",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "phase3_interfaces/heat_flux_extraction.py",
+      "sha256": "7533b0800a8ed6477d567fe08e29e308286040edd2d3e04162fe03c5dec3034a",
+      "lines": 80,
+      "source_path": "E:/JFM2024/phase3_interfaces/heat_flux_extraction.py",
+      "source_sha256": "7533b0800a8ed6477d567fe08e29e308286040edd2d3e04162fe03c5dec3034a",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "phase3_interfaces/wall_state_contract.py",
+      "sha256": "6e797227e4bf77513e4a99eb7589586f83aa97628d094d58dccaf3cce364d22c",
+      "lines": 25,
+      "source_path": "E:/JFM2024/phase3_interfaces/wall_state_contract.py",
+      "source_sha256": "6e797227e4bf77513e4a99eb7589586f83aa97628d094d58dccaf3cce364d22c",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "postproc/README.md",
+      "sha256": "abba38ed41274ae56273561a1a73fd9309b2cc07919a1c25be8edd906b702da5",
+      "lines": 7,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "postproc/__init__.py",
+      "sha256": "4bcd513c7df5fe119beb48ade0d45aa78986f578bcb4b3c8c0ff7eccdaeda4d8",
+      "lines": 1,
+      "source_path": "E:/JFM2024/postproc/__init__.py",
+      "source_sha256": "4bcd513c7df5fe119beb48ade0d45aa78986f578bcb4b3c8c0ff7eccdaeda4d8",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "postproc/multiharmonic_fit.py",
+      "sha256": "d943edb4dfc8350ffff7d8b7dc8b61bb72e137c6f072175888d0fea9a6528e7f",
+      "lines": 539,
+      "source_path": "E:/JFM2024/postproc/multiharmonic_fit.py",
+      "source_sha256": "8467d487e62547fdb00dddfc8d1284b25c0132256794d40a8b21b1e60677c3c4",
+      "origin": "edited",
+      "note": "仅修正指向未迁入模块的 docstring 引用"
+    },
+    {
+      "new_path": "pyproject.toml",
+      "sha256": "0fa441729e9ee07e257c3bca16ff4a0258872c06e578d31896aff625e07ab897",
+      "lines": 4,
+      "source_path": "E:/JFM2024/pyproject.toml",
+      "source_sha256": "0fa441729e9ee07e257c3bca16ff4a0258872c06e578d31896aff625e07ab897",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/README.md",
+      "sha256": "9cec247b5cf1af20eeb5def5b83af4dcc1631bf8351acefd7ec3ff49b36c9f47",
+      "lines": 14,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "reference/__init__.py",
+      "sha256": "cfbc3c98343caf4e3d23251d5858246f1af6cb20b5d57864cefb27e80fc5b188",
+      "lines": 1,
+      "source_path": "E:/JFM2024/reference/__init__.py",
+      "source_sha256": "cfbc3c98343caf4e3d23251d5858246f1af6cb20b5d57864cefb27e80fc5b188",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/analytical_models.py",
+      "sha256": "c5c053a874a30b1f4ece496fa7a095e645202d170230c9c0421921ebb76447a9",
+      "lines": 127,
+      "source_path": "E:/JFM2024/reference/analytical_models.py",
+      "source_sha256": "c5c053a874a30b1f4ece496fa7a095e645202d170230c9c0421921ebb76447a9",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/constants.py",
+      "sha256": "bd2d0b184049f74673fb15b5b436cab97e8df1ac92af1f3effbf6ea46e9affb4",
+      "lines": 99,
+      "source_path": "E:/JFM2024/reference/constants.py",
+      "source_sha256": "bd2d0b184049f74673fb15b5b436cab97e8df1ac92af1f3effbf6ea46e9affb4",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/continuum_1d_freq.py",
+      "sha256": "b82f41f6ebbaddf4cf86b49eee356948cb7e83c35cdd339630739ab618140904",
+      "lines": 191,
+      "source_path": "E:/JFM2024/reference/continuum_1d_freq.py",
+      "source_sha256": "b82f41f6ebbaddf4cf86b49eee356948cb7e83c35cdd339630739ab618140904",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/film_ode.py",
+      "sha256": "788a05f9980b2d6d046da3d93a3c49e935f26c393e17ffb028998958a85fb4aa",
+      "lines": 103,
+      "source_path": "E:/JFM2024/reference/film_ode.py",
+      "source_sha256": "788a05f9980b2d6d046da3d93a3c49e935f26c393e17ffb028998958a85fb4aa",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/result_schema.py",
+      "sha256": "c31f1694f900cbdb75224ba7d80ebc9f16bf61a1ab6ca1f93837abe22334283e",
+      "lines": 155,
+      "source_path": "E:/JFM2024/reference/result_schema.py",
+      "source_sha256": "c31f1694f900cbdb75224ba7d80ebc9f16bf61a1ab6ca1f93837abe22334283e",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "reference/thermal_admittance.py",
+      "sha256": "bdeb073aad0954303750d5bb0c610411e82ef084342ada3f97bb82d539ab28c4",
+      "lines": 64,
+      "source_path": "E:/JFM2024/reference/thermal_admittance.py",
+      "source_sha256": "bdeb073aad0954303750d5bb0c610411e82ef084342ada3f97bb82d539ab28c4",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "requirements-lock.txt",
+      "sha256": "54843ab3dff6ad23fede35dafb896aaa7c89b1fd8e926fb848b129ad0772bc13",
+      "lines": 19,
+      "source_path": "E:/JFM2024/requirements-lock.txt",
+      "source_sha256": "54843ab3dff6ad23fede35dafb896aaa7c89b1fd8e926fb848b129ad0772bc13",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "requirements.txt",
+      "sha256": "821d849e91e7eb5cd3e617afa98964423e33b2531f2c077e12b3dfcf0f01d4fd",
+      "lines": 6,
+      "source_path": "E:/JFM2024/requirements.txt",
+      "source_sha256": "821d849e91e7eb5cd3e617afa98964423e33b2531f2c077e12b3dfcf0f01d4fd",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "scripts/README.md",
+      "sha256": "16c9fba005624a8d7bd4f4b175080ce250032839bb10f66f72a650fe5a5fa167",
+      "lines": 14,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "scripts/run_gas_smoke.py",
+      "sha256": "f666c3f081994670bf39a454b81f04920ba983ed8393bba223253947955082bf",
+      "lines": 43,
+      "source_path": "E:/JFM2024/scripts/run_gas_smoke.py",
+      "source_sha256": "f666c3f081994670bf39a454b81f04920ba983ed8393bba223253947955082bf",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "scripts/verify_kirchhoff.py",
+      "sha256": "857fe1b0368729a69d1447074911313975c2d923d5b2ad393fe719a9144c4cf3",
+      "lines": 193,
+      "source_path": "E:/JFM2024/scripts/verify_kirchhoff.py",
+      "source_sha256": "857fe1b0368729a69d1447074911313975c2d923d5b2ad393fe719a9144c4cf3",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "scripts/verify_nearfilm_chain.py",
+      "sha256": "80b6e0f7dba419462a2410ab1c98d298a607e1111ceb6a345e749abb623bce18",
+      "lines": 302,
+      "source_path": "E:/JFM2024/scripts/verify_nearfilm_chain.py",
+      "source_sha256": "80b6e0f7dba419462a2410ab1c98d298a607e1111ceb6a345e749abb623bce18",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/README.md",
+      "sha256": "c89a2ecb683c8c308b86aa529a54d192edbf97b5582170d097bcb6fa6235ed9a",
+      "lines": 21,
+      "origin": "new",
+      "source_path": null
+    },
+    {
+      "new_path": "verification/__init__.py",
+      "sha256": "90d306746f0093628b7effa3c712a307a61e3b07e937019f31a779472c376d75",
+      "lines": 1,
+      "source_path": "E:/JFM2024/verification/__init__.py",
+      "source_sha256": "90d306746f0093628b7effa3c712a307a61e3b07e937019f31a779472c376d75",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/acoustic_wave_measurement.py",
+      "sha256": "e9ac8cad794bd7071ef71e8fe28fecc1f7555e1b74cbd74815b3069dae138d34",
+      "lines": 542,
+      "source_path": "E:/JFM2024/verification/acoustic_wave_measurement.py",
+      "source_sha256": "e9ac8cad794bd7071ef71e8fe28fecc1f7555e1b74cbd74815b3069dae138d34",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/local_transport_measurement.py",
+      "sha256": "a660ec07105d245a0f6c96389f29527356492e748dbaaafa8848fcc2d052905b",
+      "lines": 142,
+      "source_path": "E:/JFM2024/verification/local_transport_measurement.py",
+      "source_sha256": "a660ec07105d245a0f6c96389f29527356492e748dbaaafa8848fcc2d052905b",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/shear_wave_measurement.py",
+      "sha256": "375470d709dbb552da4e02a2ea57af3d492ff9e0f134bb37960ecf1fb88983d0",
+      "lines": 354,
+      "source_path": "E:/JFM2024/verification/shear_wave_measurement.py",
+      "source_sha256": "375470d709dbb552da4e02a2ea57af3d492ff9e0f134bb37960ecf1fb88983d0",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_analytic_stress_transport.py",
+      "sha256": "8532cfe817d1a758aadda7a3f9fedc3d6a5a2ec0beabcc2b0cc5a41748fad0a0",
+      "lines": 58,
+      "source_path": "E:/JFM2024/verification/test_analytic_stress_transport.py",
+      "source_sha256": "8532cfe817d1a758aadda7a3f9fedc3d6a5a2ec0beabcc2b0cc5a41748fad0a0",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_collision_sign_and_conservation.py",
+      "sha256": "0c58d01b63c5edc35b9003b6369d4a381075dc7a5863b70fcb25a9ff9fb60d3f",
+      "lines": 99,
+      "source_path": "E:/JFM2024/verification/test_collision_sign_and_conservation.py",
+      "source_sha256": "0783b9c1b2c8e0d18d96cb776b36ed68a21085d2776721fc8f1d0ab36787d0d6",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "verification/test_conservative_chain.py",
+      "sha256": "420c20a64544b217c6303799486e8d11474f9dbb8b371a6112596be88f59ddfb",
+      "lines": 101,
+      "source_path": "E:/JFM2024/verification/test_conservative_chain.py",
+      "source_sha256": "420c20a64544b217c6303799486e8d11474f9dbb8b371a6112596be88f59ddfb",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_local_handoff.py",
+      "sha256": "976980792ece9db9b80abff9795c28b95260d519707373370058ef069f0e659a",
+      "lines": 26,
+      "source_path": "E:/JFM2024/verification/test_local_handoff.py",
+      "source_sha256": "976980792ece9db9b80abff9795c28b95260d519707373370058ef069f0e659a",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_local_transport.py",
+      "sha256": "aa0d79b529d9c3a22c3b498b46f608f3aed10c8c3ad460bbdd73b114f8814f00",
+      "lines": 142,
+      "source_path": "E:/JFM2024/verification/test_local_transport.py",
+      "source_sha256": "aa0d79b529d9c3a22c3b498b46f608f3aed10c8c3ad460bbdd73b114f8814f00",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_local_transport_dynamics.py",
+      "sha256": "b160605a3be7ed68c384013922e92b1bacd4a0e53473fa04e4bbae7b62c3ea59",
+      "lines": 32,
+      "source_path": "E:/JFM2024/verification/test_local_transport_dynamics.py",
+      "source_sha256": "b160605a3be7ed68c384013922e92b1bacd4a0e53473fa04e4bbae7b62c3ea59",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_multiharmonic_fit.py",
+      "sha256": "53dd4adc2231a621fa4ae2feac17ae516749c0ca6a71d739a21e766823057a95",
+      "lines": 227,
+      "source_path": "E:/JFM2024/verification/test_multiharmonic_fit.py",
+      "source_sha256": "53dd4adc2231a621fa4ae2feac17ae516749c0ca6a71d739a21e766823057a95",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase1_constants.py",
+      "sha256": "082d0a55ebd6ca09920d81cc8ec99db0f3d8226e2b3d1cf0da08091d9d98bcc0",
+      "lines": 21,
+      "source_path": "E:/JFM2024/verification/test_phase1_constants.py",
+      "source_sha256": "082d0a55ebd6ca09920d81cc8ec99db0f3d8226e2b3d1cf0da08091d9d98bcc0",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase1_film_ode.py",
+      "sha256": "2337865a330cfa159acaa9cde69142a050b73d43e8cc995ad8b991fb87ad97ae",
+      "lines": 21,
+      "source_path": "E:/JFM2024/verification/test_phase1_film_ode.py",
+      "source_sha256": "2337865a330cfa159acaa9cde69142a050b73d43e8cc995ad8b991fb87ad97ae",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase1_thermal_admittance.py",
+      "sha256": "d70181f495d5e6fe0e609e51ac9ed8835e19e2d3cd66b0d383c833da427ada0b",
+      "lines": 29,
+      "source_path": "E:/JFM2024/verification/test_phase1_thermal_admittance.py",
+      "source_sha256": "d70181f495d5e6fe0e609e51ac9ed8835e19e2d3cd66b0d383c833da427ada0b",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase2_d2q37_fallback.py",
+      "sha256": "33e2be805db0c54f4f110d88447713836a24e201e6807dc8d211b5b5500a50e9",
+      "lines": 23,
+      "source_path": "E:/JFM2024/verification/test_phase2_d2q37_fallback.py",
+      "source_sha256": "33e2be805db0c54f4f110d88447713836a24e201e6807dc8d211b5b5500a50e9",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase3_film_ode.py",
+      "sha256": "8a33977a6382f6d9fa5ba8a431d7fca02c1b3c80d9ec36b02ac9627ebbd057c1",
+      "lines": 192,
+      "source_path": "E:/JFM2024/verification/test_phase3_film_ode.py",
+      "source_sha256": "8a33977a6382f6d9fa5ba8a431d7fca02c1b3c80d9ec36b02ac9627ebbd057c1",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase4_d3_compact_source.py",
+      "sha256": "a13f14e078229244eee40bea10d9bce5dc92fab06390b9727aaba65b732ed971",
+      "lines": 86,
+      "source_path": "E:/JFM2024/verification/test_phase4_d3_compact_source.py",
+      "source_sha256": "a13f14e078229244eee40bea10d9bce5dc92fab06390b9727aaba65b732ed971",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_phase4_kirchhoff.py",
+      "sha256": "54139879ae792b0668255b9d38583cfe86efc0b0d57ffcd125a701148bc929d0",
+      "lines": 86,
+      "source_path": "E:/JFM2024/verification/test_phase4_kirchhoff.py",
+      "source_sha256": "54139879ae792b0668255b9d38583cfe86efc0b0d57ffcd125a701148bc929d0",
+      "origin": "verbatim"
+    },
+    {
+      "new_path": "verification/test_quadrature_equilibrium.py",
+      "sha256": "1bdc94551ee572bab777fe5268ef79191b4088fa870253ec089268f128d67451",
+      "lines": 122,
+      "source_path": "E:/JFM2024/verification/test_quadrature_equilibrium.py",
+      "source_sha256": "c8de1618558742957e4219043eca2aec5f82a2dda9604f31d5b40563f4f51bf9",
+      "origin": "trimmed"
+    },
+    {
+      "new_path": "verification/thermal_diffusion_measurement.py",
+      "sha256": "4ca663830fa331de7052fc922af719f6f5bbe107415218241beebbff426efb6e",
+      "lines": 402,
+      "source_path": "E:/JFM2024/verification/thermal_diffusion_measurement.py",
+      "source_sha256": "4ca663830fa331de7052fc922af719f6f5bbe107415218241beebbff426efb6e",
+      "origin": "verbatim"
+    }
+  ],
+  "dropped": [
+    {
+      "source_path": "E:/JFM2024/boundary/open_cbc.py",
+      "source_sha256": "1b9a69afcdddb16776e0be5741a9bcdb25149160833063d99829fb0fce4c3aa4",
+      "reason": "开放边界，未认证，不在链路闭包内"
+    },
+    {
+      "source_path": "E:/JFM2024/boundary/open_sponge.py",
+      "source_sha256": "ce390d71bc4703f01b68e9e9c17cb0270c3a44584dc2ee78bc6d97c9d5dafdce",
+      "reason": "开放边界备用方案，未认证，不在链路闭包内"
+    },
+    {
+      "source_path": "E:/JFM2024/boundary/wall_mass_audit.py",
+      "source_sha256": "1ca55028b1b87f7ea34f9d81164c461caa123fa5b63f3bf4ebfa503161f89651",
+      "reason": "旧审计夹具"
+    },
+    {
+      "source_path": "E:/JFM2024/boundary/wall_neumann.py",
+      "source_sha256": "84055cbdf70941fbc38f897a0eb412021b8039488040bf67cdec90fc6ce7f673",
+      "reason": "旧给定热流夹具，链路不用（B 模式用 thermal_grad）"
+    },
+    {
+      "source_path": "E:/JFM2024/core/hermite.py",
+      "source_sha256": "67bb3acb7675702c58a4f6411c032e2e652a95e35c89e8b973f7f95e8bac6a1c",
+      "reason": "死代码；被使用的 monomial_exponents 已内联到 equilibrium.py"
+    },
+    {
+      "source_path": "E:/JFM2024/core/lattice_d2q21.py",
+      "source_sha256": "30cbe209f9c9dfa1ee017499a3a353777b0da6baca33a598354a9d2aa9e363e6",
+      "reason": "退役速度集：四阶平衡态需八阶求积"
+    },
+    {
+      "source_path": "E:/JFM2024/core/polyatomic_fg.py",
+      "source_sha256": "4163266c8b1f4ea64639711c5b6c75184d6088a0d63aa9d2dfd8f51973aaf3b7",
+      "reason": "全仓无调用"
+    },
+    {
+      "source_path": "E:/JFM2024/core/retired_spectral.py",
+      "source_sha256": "c6d55579518726c60e24fbcbdf354d4b5aeb5f3368f206e50d6f4ba25783e0a3",
+      "reason": "退役 DC/A/H 保护；新内核改为在 unit_mapping 里显式拒绝旧取值"
+    },
+    {
+      "source_path": "E:/JFM2024/phase3_interfaces/modal_fit.py",
+      "source_sha256": "ed6f582b232a71cebff172f7fee0e6415b8452e0d7477362d534770ea214b3eb",
+      "reason": "旧模态工具，链路用 postproc/multiharmonic_fit"
+    },
+    {
+      "source_path": "E:/JFM2024/phase3_interfaces/probe_sampling.py",
+      "source_sha256": "2c336c50bfa0dd69de7cce04c48774e8d3e7473bf78b2f63219a5336b9a6f565",
+      "reason": "无调用"
+    },
+    {
+      "source_path": "E:/JFM2024/phase3_interfaces/run_hdf5.py",
+      "source_sha256": "e8395b54fe674e8a7c9052a75ea75f29901d599f2926f23bb2e2af6ec2ad31e6",
+      "reason": "旧交接入口，HDF5 由 solver.save_hdf5 直接提供"
+    },
+    {
+      "source_path": "E:/JFM2024/postproc/harmonic_fit.py",
+      "source_sha256": "3e29c38a57b40a5127cb93ca8e3f77679f0d074778d25530702d6b8d48eeeace",
+      "reason": "单音拟合，有趋势时应使用联合拟合器"
+    },
+    {
+      "source_path": "E:/JFM2024/reference/continuum_1d_time.py",
+      "source_sha256": "ca9570afbdfa8fcc30695498ab91f63b239eb1b66d13744854406d2c0b23e73d",
+      "reason": "时域参照，不在链路闭包内"
+    },
+    {
+      "source_path": "E:/JFM2024/reference/nonlinear_nsf_1d.py",
+      "source_sha256": "e14da1a1693b080d11495bd325475e29735085ef21145d4585f6af144b3f1260",
+      "reason": "非线性参照，不在链路闭包内"
+    },
+    {
+      "source_path": "E:/JFM2024/scripts/check_environment.py",
+      "source_sha256": "b526a14fdb6d5ee0215826dea93bea5c71a83d5202ea5901955e3be226b6be0f",
+      "reason": "旧仓环境检查"
+    },
+    {
+      "source_path": "E:/JFM2024/scripts/verify_local_transport.py",
+      "source_sha256": "f96f1718ab4804016f4e1b1d7102591b6a9f72a89cae86a1c8664a670886a992",
+      "reason": "局部输运矩阵扫描（一次性审计）"
+    },
+    {
+      "source_path": "E:/JFM2024/verification/test_phase2_postprocess_modal_fit.py",
+      "source_sha256": "1784ca1b0a39dad8395b2164044dc3348c3f9c7fa47e8bed8b3e97eb677b70de",
+      "reason": "随 modal_fit 移除"
+    }
+  ],
+  "counts": {
+    "verbatim": 57,
+    "trimmed": 10,
+    "edited": 2,
+    "new": 13
+  }
+}

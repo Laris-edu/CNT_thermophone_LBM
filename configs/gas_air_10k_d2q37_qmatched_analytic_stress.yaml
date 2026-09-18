@@ -1,0 +1,178 @@
+# 解析应力闭合（2026-09-10）：沿用求积匹配映射与加权 F4/G2 平衡态。
+# 迹按 nu_b -> tau22 松弛；偏应力按 nu -> tau21 松弛实际中心矩，方向因子恒为 1。
+# 不使用 DC/A/H，也没有按声压拟合的增益。验证范围为小振幅周期体内传播。
+# 壁面、完整薄膜耦合和有限温升需另行验证；旧 v2v4 clean 配置保留作对照。
+case:
+  name: gas_air_10k_d2q37_qmatched_analytic_stress
+  phase: Phase_2
+  purpose: "小振幅体内热声传播：修复配置零体黏度与实际迹清零不一致，并按黏度统一偏应力"
+
+physical:
+  T0_K: 300.0
+  p0_Pa: 101325.0
+  rho0_kg_m3: 1.177
+  c0_m_s: 347.0
+  gamma: 1.4
+  cp_J_kgK: 1005.0
+  kg_W_mK: 0.0263
+  nu0_m2_s: 1.57e-5
+  alpha0_m2_s: 2.2233775895e-5
+  Pr: 0.7061328707
+
+lattice:
+  velocity_set: D2Q37
+  Q: 37
+  D: 2
+  S: 3
+  dx_m: 2.61175e-6   # tuned: k_thermal=1/delta_T -> calibration k 2*pi/64 (10 kHz air, delta_T=26.6 um)
+  dt_s: 7.440476190476191e-09   # = 1e-4 s / 13440 steps per period exactly (64 samples x 210 steps)
+  theta_q_lu: 0.6979533220196852
+  theta_ref_policy: physical_sound_speed   # theta_ref = (c0 dt/dx)^2/gamma = 0.69802 (0.01 % above theta_q)
+  theta_transport_policy: theta_ref_lu
+  rho_ref_lu: 1.0
+
+collision:
+  model: SMRT_central_Hermite_regularized_stress
+  bulk_viscosity_policy: diagnostic_zero
+  nu_b_lu: auto
+  central_moment_closure: second_order
+  high_order_relaxation: 1.0
+  trace_bulk_policy: tau22   # nu_b=0 对应 tau22=1/2、迹保留因子 -1；清零相当于 tau_trace=1
+  trace_bulk_scale: 1.0
+  trace_bulk_calibration_id: null
+  use_binomial_transform: true
+  deviatoric_stress_policy: measured  # 使用实际非平衡中心矩；这里 measured 不代表经验拟合
+  regularized_shear_xy_factor: 1.0  # 所有偏应力统一乘 (1-1/tau21)
+  regularized_shear_normal_factor: 1.0
+  regularized_heat_flux_factor: -0.8700532148881626   # h32 = 1 - 1/tau32 at THIS dt (BGK-equivalent retention, C_h = 1)
+  heat_flux_retention_policy: specified   # QM2 (V4): the frozen affine curve is an absolute factor that does not transfer to theta_q
+  heat_flux_retention_curve:
+    type: affine
+    coefficients: [-0.5030006782780277, 0.7230829392328689]
+  regularized_heat_flux_f_fraction: 0.5714285714285714
+  conductive_heat_flux_moment_factor: 0.0635448   # re-tuned at the new tau (prod 0.0422 x1.5058) so Fourier-q export is accurate
+  conductive_heat_flux_galilean_correction_factor: 0.03835608923273733
+
+numerics:
+  precision: float64
+  streaming: pull
+  boundary: periodic
+  nx: 64
+  ny: 4
+  steps: 16
+  output_interval: 1
+
+postprocess:
+  save_hdf5: true
+
+p2_04_shear_wave:
+  nx: 64
+  ny: 64
+  steps: 240
+  sample_interval: 1
+  mode_index: 1
+  amplitude: 1.0e-5
+  fit_start: 10
+  directions: [x, y, diagonal]
+  relative_tolerance: 0.05
+
+p2_05_thermal_diffusion:
+  nx: 64
+  ny: 64
+  steps: 320
+  sample_interval: 1
+  mode_index: 1
+  amplitude: 1.0e-5
+  fit_start: 10
+  directions: [x, y, diagonal]
+  relative_tolerance: 0.05
+  heat_flux_tolerance: 0.05
+
+p2_06_acoustic_wave:
+  nx: 64
+  ny: 64
+  steps: 240
+  sample_interval: 1
+  mode_index: 1
+  amplitude: 1.0e-6
+  fit_start: 10
+  directions: [x, y, diagonal]
+  sound_speed_tolerance: 0.02
+  gamma_tolerance: 0.02
+  direction_tolerance: 0.02
+
+p2_07_prandtl_scan:
+  pr_targets: [0.5, 0.7061328707, 1.0, 2.0]
+  baseline_pr: 0.7061328707
+  baseline_tolerance: 0.03
+  scan_tolerance: 0.05
+  # Air is Pr~0.706<1; Pr>hard_pr_max is a bounded robustness GO-RISK probe
+  # (measured + reported, non-blocking). Hard gate over the air-relevant range.
+  hard_pr_max: 1.0
+  shear_wave:
+    nx: 64
+    ny: 64
+    steps: 240
+    sample_interval: 1
+    mode_index: 1
+    amplitude: 1.0e-5
+    fit_start: 10
+    directions: [x]
+    relative_tolerance: 0.05
+  thermal_diffusion:
+    nx: 64
+    ny: 64
+    steps: 320
+    sample_interval: 1
+    mode_index: 1
+    amplitude: 1.0e-5
+    fit_start: 10
+    directions: [x]
+    relative_tolerance: 0.05
+    heat_flux_tolerance: 0.05
+
+p2_09_galilean_consistency:
+  mach_numbers: [0.0, 0.02, 0.05]
+  background_directions: [x, diagonal]
+  drift_tolerance: 0.02
+  sound_speed_tolerance: 0.02
+  gamma_tolerance: 0.02
+  direction_tolerance: 0.02
+  dispersion_delta_tolerance: 0.005
+  run_dispersion_masking_check: false  # 已退役的 DC 消融仪器
+  run_high_mode_acoustic_diagnostic: false  # 已退役的 A 相位仪器
+  shear_wave:
+    nx: 64
+    ny: 64
+    steps: 120
+    sample_interval: 1
+    mode_index: 1
+    amplitude: 1.0e-5
+    fit_start: 10
+    directions: [x, y, diagonal]
+    relative_tolerance: 0.05
+    direction_tolerance: 0.05
+  thermal_diffusion:
+    nx: 64
+    ny: 64
+    steps: 320
+    sample_interval: 1
+    mode_index: 1
+    amplitude: 1.0e-5
+    fit_start: 10
+    directions: [x, y, diagonal]
+    relative_tolerance: 0.05
+    heat_flux_tolerance: 0.05
+  acoustic_wave:
+    nx: 64
+    ny: 64
+    steps: 80
+    sample_interval: 1
+    mode_index: 1
+    amplitude: 1.0e-6
+    fit_start: 10
+    directions: [x, y, diagonal]
+  high_mode_acoustic:
+    mode_index: 2
+    steps: 80
+    directions: [x, y, diagonal]
