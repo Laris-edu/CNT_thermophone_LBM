@@ -17,7 +17,8 @@
 
 ## 环境与运行
 
-需要 Python 3.14 与本目录的 `.venv`（可复用旧仓解释器，或按下式重建）：
+本目录的 `.venv`（Python 3.14.2）已按 `requirements-lock.txt` 装齐依赖，直接可用。
+如需重建：
 
 ```powershell
 cd E:\CNT_thermophone_LBM
