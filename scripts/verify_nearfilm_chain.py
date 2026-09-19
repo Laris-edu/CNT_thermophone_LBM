@@ -26,6 +26,7 @@ from coupling.film_ode import FilmOdeParams
 from postproc.multiharmonic_fit import fit_multiharmonic
 from reference.constants import PhysicalParams
 from reference.continuum_1d_freq import solve_level_C_frequency
+from simulation.output import OutputLayout
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / 'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
@@ -116,7 +117,7 @@ def fit(t, x, frequency):
     return fit_multiharmonic(t, x, 2*np.pi*frequency, n_harmonics=3, detrend_order=1)
 
 
-def analyze(solver, args, coupled):
+def analyze(solver, args, coupled, output):
     samples = solver.samples
     data = {k: np.asarray([s[k] for s in samples]) for k in samples[0]}
     t = data['t']
@@ -177,9 +178,9 @@ def analyze(solver, args, coupled):
         p=[complex_record(z) for z in ref['p']],
         energy_identity_relative=ref['energy_identity_relative'],
         bvp_max_rms_residual=ref['bvp_max_rms_residual'])
-    np.savez_compressed(args.output/'observations.npz',**data)
+    np.savez_compressed(output/'observations.npz',**data)
     if coupled is not None:
-        np.savez_compressed(args.output/'coupled.npz', **{k:getattr(coupled,k) for k in
+        np.savez_compressed(output/'coupled.npz', **{k:getattr(coupled,k) for k in
             ['t_si','T_s_K','P_in_si','q_g_one_sided_si','pressure_probe_Pa',
              'T_wall_K','mass_lu','p_box_mean_Pa','predictor_corrector_delta_K',
              'gas_energy_J_m2','wall_energy_increment_J_m2','input_work_increment_J_m2',
@@ -208,14 +209,14 @@ def main():
         parser.error('要求 cycles>=3, ny>=24, nx>=1, frequency>0, stride>=1, refine>=1')
     if args.mode == 'B' and args.wall != 'mass_neutral':
         parser.error('B only supports the symmetric mass-neutral wall')
-    args.output.mkdir(parents=True,exist_ok=False)
+    output = OutputLayout(args.output).create_case()
     config = load_config(args.config)
     config['numerics'].update(nx=args.nx,ny=args.ny*args.refine)
     config['lattice']['dx_m'] /= args.refine
     config['lattice']['dt_s'] /= args.refine
     config['numerics']['steps'] = int(round(args.cycles/(args.frequency*config['lattice']['dt_s'])))
-    (args.output/'baseline.yaml').write_bytes(args.config.read_bytes())
-    (args.output/'effective.yaml').write_text(yaml.safe_dump(config,allow_unicode=True),encoding='utf-8')
+    (output/'baseline.yaml').write_bytes(args.config.read_bytes())
+    (output/'effective.yaml').write_text(yaml.safe_dump(config,allow_unicode=True),encoding='utf-8')
     solver = ObservedSolver(config,args.stride,args.frequency)
     solver.probe_rows = [args.refine*j for j in [1,5,10,args.ny//2]]
     ph, mp = solver.mapping.physical, solver.mapping
@@ -236,12 +237,12 @@ def main():
                         interface_energy_relative=0.05,reference_amplitude_relative=0.05,
                         reference_phase_deg=5.0),
         source_sha256={})
-    files = [ROOT/'config_io.py', Path(__file__).resolve(),args.config]
-    for folder in ['core','boundary','coupling','phase3_interfaces','postproc','reference']:
+    files = [ROOT/'config_io.py', ROOT/'scripts/output_layout.py', Path(__file__).resolve(),args.config]
+    for folder in ['core','boundary','coupling','phase3_interfaces','postproc','reference','simulation']:
         files.extend(sorted((ROOT/folder).glob('*.py')))
     summary['source_sha256'] = {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
-    (args.output/'manifest.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
-    with ZipFile(args.output/'source_snapshot.zip','w',ZIP_DEFLATED) as archive:
+    (output/'manifest.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+    with ZipFile(output/'source_snapshot.zip','w',ZIP_DEFLATED) as archive:
         for relative in summary['source_sha256']:
             archive.write(ROOT/relative,relative)
     steps = int(round(args.cycles/(args.frequency*mp.lattice.dt_s)))
@@ -283,16 +284,16 @@ def main():
                 drive=SinusoidalDrive(0,complex(args.amplitude),args.frequency),n_steps=steps,
                 wall_bc=args.wall,grad_extrap='row1',q_feedback_relax=args.relax,
                 q_feedback_scale=1,q_extraction=None,probe=(10*args.refine,0),scheme=args.scheme)
-        summary.update(analyze(solver,args,coupled))
+        summary.update(analyze(solver,args,coupled,output))
         summary['run_completed'] = True
     except Exception as exc:
         summary.update(run_completed=False,error=str(exc),traceback=traceback.format_exc())
         if solver.samples:
-            np.savez_compressed(args.output/'partial_observations.npz',**{
+            np.savez_compressed(output/'partial_observations.npz',**{
                 k:np.asarray([s[k] for s in solver.samples]) for k in solver.samples[0]})
         print(summary['traceback'],flush=True)
     summary['elapsed_s'] = time.perf_counter()-began
-    (args.output/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+    (output/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
     print(f'诊断结束，run_completed={summary["run_completed"]}, elapsed={summary["elapsed_s"]:.2f}s',flush=True)
     if not summary['run_completed']:
         raise SystemExit(1)

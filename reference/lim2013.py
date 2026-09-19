@@ -1,7 +1,7 @@
 """Lim, Tong & Li (2013) 悬空 CNT 薄膜热声源的精确解与近似解。
 
 出处：C.W. Lim, L.H. Tong, Y.C. Li, "Theory of suspended carbon nanotube thinfilm as a
-thermal-acoustic source", Journal of Sound and Vibration 332 (2013) 6329-6342.
+thermal-acoustic source", Journal of Sound and Vibration 332 (2013) 5451-5461.
 
 本模块实现论文的：
 
@@ -25,7 +25,8 @@ thermal-acoustic source", Journal of Sound and Vibration 332 (2013) 6329-6342.
 ``gas_from_physical_params`` 走仓库自己的常数：
 
 * Table 1 给 ``alpha = 2.25e-5``，而 ``kappa/(rho0*cp) = 2.2451e-5``（差 0.2 %）；
-* Table 1 的 ``rho0*cp*(gamma-1)/gamma = 100028 Pa``，而 ``P0 = 101325 Pa``（差 1.3 %）。
+* Table 1 的 ``rho0 = 1.16`` 与理想气体值 ``P0/(R*T0) = 1.177`` 差 1.4 %，使
+  ``rho0*cp*T0*(gamma-1)/gamma = 100025 Pa`` 而 ``P0 = 101325 Pa``（差 1.3 %）。
   后者正是本仓链路相对论文 Eq. (22) 恒定高出 1.3 % 的来源。
 """
 
@@ -102,6 +103,15 @@ TABLE1_ARGON = LimGas(
     alpha_m2_s=2.06e-5,
     gamma=1.664,
 )
+
+
+def matched_gas(mapping) -> LimGas:
+    """Match the actual LBM EOS rather than its separately configured nominal p0."""
+    ph = mapping.physical
+    return LimGas(rho0_kg_m3=ph.rho0_kg_m3, cp_J_kgK=ph.cp_J_kgK,
+        kappa_W_mK=ph.kg_W_mK, c0_m_s=ph.c0_m_s, alpha_m2_s=ph.alpha0_m2_s,
+        gamma=ph.gamma, p0_Pa=mapping.lattice.rho_ref_lu*mapping.theta_ref_lu*mapping.pressure_scale,
+        T0_K=ph.T0_K)
 
 
 def gas_from_physical_params(params: PhysicalParams | None = None) -> LimGas:
@@ -246,10 +256,11 @@ def conductive_heat_flux_hat(
 
 
 def near_field_pressure_hat_from_flux(q_hat_one_sided: complex, gas: LimGas = TABLE1_AIR) -> complex:
-    """近场声压复幅 ``p_hat = (gamma-1) * Q0_hat / c0``（论文 Eq. 19 / A.14）。
+    """紧致热层近似 ``p_hat = (gamma-1) * Q0_hat / c0``，未含传播相位。
 
-    这是紧致热层恒等式：它把"声压"问题完全转成"壁面热流"问题。本仓 LBM 的闭箱压力
-    探针不能用于此处，但壁面热流 ``q_g_one_sided_si`` 可以。
+    使用 exp(+i omega t) 与向外为正的热流约定，从精确式 (9)--(12) 得正号。
+    原文式 (19)/A.14 最后一行印刷负号与该出射分支及式 (21) 不一致。
+    此关系只支持 LBM 热流换算，不构成直接压力场验证；距离 x 的传播因子需另乘。
     """
 
     return (gas.gamma - 1.0) * complex(q_hat_one_sided) / gas.c0_m_s

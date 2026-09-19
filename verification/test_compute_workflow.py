@@ -1,0 +1,220 @@
+"""Configuration expansion, non-overwrite, provenance and execution status contracts."""
+import json
+from pathlib import Path
+import subprocess
+
+import numpy as np
+import pytest
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+BASE = ROOT / 'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
+
+
+def write_study(tmp_path, **values):
+    path = tmp_path / 'study.yaml'
+    path.write_text(yaml.safe_dump(dict(base_config=str(BASE), **values)), encoding='utf-8')
+    return path
+
+
+def test_study_expands_sweep_and_resolves_complete_configuration(tmp_path):
+    from simulation.study import load_study
+    path = write_study(tmp_path, defaults={'refine': 1, 'cycles': 6},
+        cases=[{'name': 'pulse', 'mode': 'pulse'}],
+        sweeps=[{'name': 'thermal', 'parameters': {'frequency_Hz': [50000, 75000], 'refine': [2, 4]}}])
+    cases = load_study(path)
+    assert len(cases) == 5
+    assert len({c['case']['name'] for c in cases}) == 5
+    assert cases[0]['run']['mode'] == 'pulse'
+    for case in cases[1:]:
+        run = case['run']
+        assert case['lattice']['dx_m'] == pytest.approx(2.61175e-6 / run['refine'])
+        assert run['probes_m'] == [.00012, .0003, .0006]
+        assert run['analysis']['harmonics'] == 3
+        assert run['sampling']['profile_cycles'] == 2
+        assert case['numerics']['boundary'] == 'planar_open_y'
+        assert case['numerics']['steps'] > 0
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['study.yaml']
+
+
+@pytest.mark.parametrize('bad', [
+    {'name': '../outside'}, {'name': 'CON'}, {'name': 'x', 'refine': 1.5},
+    {'name': 'x', 'frequency_Hz': float('nan')}, {'name': 'x', 'probes_m': [.002]},
+    {'name': 'x', 'amplitdue_K': .2}, {'name': 'x', 'cycles': 3, 'ramp_cycles': 2},
+    {'name': 'x', 'analysis': {'detrend_order': 1.0}},
+    {'name': 'x', 'mode': 'pulse', 'refine': 1, 'pulse': {'window_fraction': .0001}},
+])
+def test_invalid_cases_are_rejected_before_creating_outputs(tmp_path, bad):
+    from simulation.study import load_study
+    path = write_study(tmp_path, cases=[bad])
+    with pytest.raises(ValueError):
+        load_study(path)
+    assert len(list(tmp_path.iterdir())) == 1
+
+
+def test_duplicate_case_names_and_batch_collisions_are_rejected_before_run(tmp_path):
+    from simulation import run_study
+    from simulation.study import load_study
+    path = write_study(tmp_path, cases=[{'name': 'same'}, {'name': 'Same'}])
+    with pytest.raises(ValueError, match='duplicate'):
+        load_study(path)
+    path = write_study(tmp_path, defaults={'mode': 'pulse', 'refine': 1},
+                       cases=[{'name': 'first'}, {'name': 'existing'}])
+    existing = tmp_path / 'batch/raw/existing'
+    existing.mkdir(parents=True)
+    (existing/'keep.txt').write_text('keep', encoding='utf-8')
+    with pytest.raises(FileExistsError):
+        run_study(path, 'batch')
+    assert not (tmp_path/'batch/raw/first').exists()
+    assert (existing/'keep.txt').read_text() == 'keep'
+
+
+def test_pulse_case_has_four_files_and_separate_execution_and_validation_status(tmp_path):
+    from simulation import prepare_case, run_case
+    effective = prepare_case({'name': 'pulse', 'mode': 'pulse', 'refine': 1})
+    output = tmp_path/'batch/raw/pulse'
+    result = run_case(effective, output, source_cache=tmp_path/'sources')
+    assert {p.name for p in output.iterdir()} == {'trajectory.npz','summary.json','effective.yaml','manifest.json'}
+    assert result['reflection_ratio'] == pytest.approx(.00490664292097417, rel=1e-10)
+    manifest = json.loads((output/'manifest.json').read_text(encoding='utf-8'))
+    assert manifest['status'] == 'completed'
+    assert manifest['finished_utc'] and manifest['elapsed_s'] > 0
+    assert result['validation_passed'] is True
+    with np.load(output/'trajectory.npz') as data:
+        assert data['t_s'].size == result['steps']
+        assert bool(data['run_completed'])
+    with pytest.raises(FileExistsError):
+        run_case(effective, output, source_cache=tmp_path/'sources')
+
+
+@pytest.mark.parametrize('exception,status', [(RuntimeError('test failure'),'failed'), (KeyboardInterrupt(),'interrupted')])
+def test_failure_keeps_partial_trajectory_and_marks_existing_records(tmp_path, monkeypatch, exception, status):
+    from simulation import prepare_case, run_case
+    from core.planar_open_solver import PlanarOpenSolver
+    original = PlanarOpenSolver.step_temperature
+    def step(self, temperature):
+        if self.t_lu == 2:
+            raise exception
+        return original(self, temperature)
+    monkeypatch.setattr(PlanarOpenSolver, 'step_temperature', step)
+    output = tmp_path/'pulse'
+    effective = prepare_case({'name': 'pulse', 'mode': 'pulse', 'refine': 1})
+    with pytest.raises(type(exception)):
+        run_case(effective, output, source_cache=tmp_path/'sources')
+    assert {p.name for p in output.iterdir()} == {'trajectory.npz','summary.json','effective.yaml','manifest.json'}
+    assert json.loads((output/'manifest.json').read_text())['status'] == status
+    assert json.loads((output/'summary.json').read_text())['validation_passed'] is None
+    with np.load(output/'trajectory.npz') as data:
+        assert len(data['t_s']) == 2
+        assert not bool(data['run_completed'])
+
+
+def test_source_snapshot_is_shared_by_content_without_extracting_code(tmp_path):
+    from simulation.provenance import capture_source
+    root = tmp_path/'project'
+    (root/'core').mkdir(parents=True)
+    (root/'core/example.py').write_text('value = 1\n', encoding='utf-8')
+    cache = tmp_path/'sources'
+    first = capture_source(root, cache)
+    second = capture_source(root, cache)
+    assert first['source_id'] == second['source_id']
+    assert first['snapshot'] == second['snapshot']
+    assert len(list(cache.iterdir())) == 1
+    (root/'core/example.py').write_text('value = 2\n', encoding='utf-8')
+    third = capture_source(root, cache)
+    assert third['source_id'] != first['source_id']
+    assert len(list(cache.iterdir())) == 2
+
+
+def test_clean_git_source_needs_no_snapshot_but_deletion_does(tmp_path):
+    from simulation.provenance import capture_source
+    root=tmp_path/'repo'; root.mkdir()
+    def git(*args):
+        return subprocess.run(['git','-C',str(root),*args],check=True,capture_output=True,text=True).stdout.strip()
+    git('init')
+    (root/'core').mkdir()
+    source=root/'core/example.py'; source.write_text('value = 1\n',encoding='utf-8')
+    (root/'config_io.py').write_text('value = 2\n',encoding='utf-8')
+    git('add','core/example.py','config_io.py')
+    git('-c','user.name=Compute test','-c','user.email=test@example.invalid','commit','-m','fixture')
+    cache=tmp_path/'sources'
+    clean=capture_source(root,cache)
+    assert clean['source_clean'] and clean['snapshot'] is None
+    assert not cache.exists()
+    source.unlink()
+    deleted=capture_source(root,cache)
+    assert not deleted['source_clean']
+    assert deleted['snapshot'] is not None
+
+
+def test_thermal_custom_probes_and_read_only_reanalysis(tmp_path):
+    from simulation import prepare_case, run_case, analyze_case
+    output=tmp_path/'thermal'
+    config=prepare_case(dict(name='thermal',refine=1,length_m=.00015,frequency_Hz=200000.,
+        probes_m=[.00003,.00008],cycles=2.,ramp_cycles=0.,sampling={'profile_samples_per_cycle':32}))
+    result=run_case(config,output,source_cache=tmp_path/'sources')
+    import hashlib
+    hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
+    replay=analyze_case(output)
+    assert replay['probes']==result['probes']
+    assert replay['heat_flux']==result['heat_flux']
+    assert len(replay['probes'])==2
+    assert hashes=={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
+
+
+def test_failed_numerical_gate_is_still_a_completed_run(tmp_path):
+    from simulation import prepare_case, run_case
+    config=prepare_case(dict(name='pulse',mode='pulse',refine=1,analysis={'reflection_ratio':1e-12}))
+    result=run_case(config,tmp_path/'case',source_cache=tmp_path/'sources')
+    assert result['validation_passed'] is False
+    assert json.loads((tmp_path/'case/manifest.json').read_text())['status']=='completed'
+
+
+def test_source_reference_supports_different_windows_drives():
+    import os
+    from simulation.runner import source_reference
+    if os.name != 'nt':
+        pytest.skip('Windows drive semantics')
+    assert source_reference(Path('E:/sources/source.zip'),Path('C:/case'))=='E:/sources/source.zip'
+    assert source_reference(Path('E:/sources/source.zip'),Path('E:/case'))=='../sources/source.zip'
+
+
+def test_validation_plot_selects_cases_by_parameters_and_requires_full_group():
+    from scripts.plot_planar_open import validation_groups
+    thermal=lambda name,r,H: (Path(name),dict(kind='prescribed_temperature_direct_pressure',
+        frequency_Hz=50000,wall_amplitude_K=.1,probes=[{}, {}, {}]),dict(refine=r,length=H))
+    grid=[thermal(f'grid__refine_{r}',r,.001) for r in (1,2,4)]
+    long=thermal('domain_sweep__long',2,.002)
+    pulses=[(Path(f'pulse{r}'),dict(kind='outgoing_gaussian_pulse'),dict(refine=r)) for r in (1,4)]
+    selected_grid,selected_pulses,domain=validation_groups([long,*pulses,*reversed(grid)])
+    assert selected_grid==grid and selected_pulses==pulses
+    assert domain==(grid[1],long)
+    with pytest.raises(ValueError,match='pulse'):
+        validation_groups([*grid,long])
+    with pytest.raises(ValueError,match='grid'):
+        validation_groups([*grid[:2],*pulses,long])
+
+
+def test_selected_sweep_case_matches_legacy_command(tmp_path, monkeypatch):
+    from simulation import run_study
+    from simulation.provenance import capture_source
+    from scripts.verify_planar_open import main
+    path=write_study(tmp_path,defaults={'mode':'pulse','refine':1},
+        sweeps=[{'name':'pulse','parameters':{'refine':[1,2]}}])
+    run_study(path,'batch',selected=['pulse__refine_1'],source_cache=tmp_path/'sources')
+    raw=tmp_path/'batch/raw'
+    assert [p.name for p in raw.iterdir()]==['pulse__refine_1']
+    monkeypatch.setattr('simulation.runner.capture_source',lambda root,cache: capture_source(root,tmp_path/'sources'))
+    monkeypatch.setattr('sys.argv',['verify_planar_open','--mode','pulse','--refine','1',
+        '--output',str(tmp_path/'legacy'),'--case','pulse'])
+    main()
+    new_path=raw/'pulse__refine_1'
+    old_path=tmp_path/'legacy/raw/pulse'
+    assert json.loads((new_path/'summary.json').read_text())==json.loads((old_path/'summary.json').read_text())
+    with np.load(new_path/'trajectory.npz') as new, np.load(old_path/'trajectory.npz') as old:
+        for key in new.files:
+            if key!='elapsed_s':
+                np.testing.assert_array_equal(new[key],old[key])
+    assert len(list((tmp_path/'sources').glob('*.zip')))==1
+    assert not list(tmp_path.rglob('*.md'))
+    assert not list(tmp_path.rglob('_work'))

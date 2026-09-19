@@ -9,7 +9,8 @@
   经 ``p_hat = (gamma-1) q_hat / c0`` 换算近场声压，与 Lim 逐项对照。
 
 为什么要走热流：本仓是封闭周期域，压力探针读的是封箱等容压缩
-``p_box = 2(gamma-1)q/(Omega*H)``，在本工作点比辐射声压大 90 倍以上，不能当声压用。
+``|p_box| = 2(gamma-1)|q|/(Omega*H)``；与辐射声压按同一幅值口径比较，
+默认 10 kHz、ny=64 工况约为 66 倍，不能当开放域声压用。
 热流则不受影响（域高 6.3 delta_T，热波在远端已衰减到 2e-3）。
 
 对照时 Lim 侧一律用**本仓自己的气体常数**（``gas_from_physical_params``），
@@ -49,6 +50,7 @@ from reference.lim2013 import (
     near_field_pressure_rms_exact,
     rayleigh_distance_m,
 )
+from simulation.output import OutputLayout
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_CONFIG = ROOT / "configs/gas_air_10k_d2q37_qmatched_local_transport.yaml"
@@ -229,7 +231,9 @@ def run_lbm(args: argparse.Namespace) -> dict:
     phys = mapping.physical
     gas = gas_from_physical_params(PhysicalParams(
         rho0=phys.rho0_kg_m3, cp=phys.cp_J_kgK, kg=phys.kg_W_mK,
-        c0=phys.c0_m_s, gamma=phys.gamma, p0=phys.p0_Pa, T0=phys.T0_K,
+        c0=phys.c0_m_s, gamma=phys.gamma,
+        p0=mapping.lattice.rho_ref_lu*mapping.theta_ref_lu*mapping.pressure_scale,
+        T0=phys.T0_K,
     ))
     c_s = args.capacity
     beta0 = args.beta0
@@ -308,7 +312,7 @@ def run_lbm(args: argparse.Namespace) -> dict:
         print(f"  {name:44s} dAmp={100*da:+7.2f}%  dPhase={dp:+7.2f} deg")
 
     return {
-        "scope": "10 kHz 近场：LBM 壁面热流 -> 声压，对照 Lim 2013",
+        "scope": "近场混合估计：LBM 壁面热流 -> 声压，对照 Lim 2013；非直接压力验证",
         "case": {
             "frequency_Hz": args.frequency, "cycles": args.cycles, "n_steps": n_steps,
             "nx": args.nx, "ny": args.ny, "dx_m": mapping.lattice.dx_m, "dt_s": dt,
@@ -317,6 +321,8 @@ def run_lbm(args: argparse.Namespace) -> dict:
             "delta_T_m": delta_T, "delta_T_over_dx": delta_T / mapping.lattice.dx_m,
             "height_m": height, "height_over_delta_T": height / delta_T,
             "rayleigh_distance_m": rayleigh_distance_m(args.frequency, area, gas),
+            "configured_p0_Pa": phys.p0_Pa,
+            "actual_EOS_p0_Pa": gas.p0_Pa,
         },
         "gas": asdict(gas),
         "lbm": {
@@ -346,7 +352,8 @@ def run_lbm(args: argparse.Namespace) -> dict:
         },
         "closed_box_artifact": {
             "p_box_quasistatic_amplitude_Pa": ratio_box,
-            "p_box_over_radiation": ratio_box / p_eq22,
+            "p_box_over_radiation": ratio_box / (math.sqrt(2.0)*p_eq22),
+            "ratio_convention": "amplitude/amplitude (equivalently RMS/RMS)",
             "delta_p_over_p0": ratio_box / gas.p0_Pa,
             "note": "本仓域是封闭周期箱，压力探针读等容压缩，不可当声压；声压必须由 q_g 换算",
         },
@@ -380,15 +387,15 @@ def main() -> int:
     if args.capacity <= 0.0 or args.beta0 < 0.0 or args.area <= 0.0 or args.power <= 0.0:
         parser.error("capacity/area/power 必须为正，beta0 非负")
 
-    args.output.mkdir(parents=True, exist_ok=True)
+    output = OutputLayout(args.output).create_case()
     summary: dict = {"created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     if args.mode in ("analytic", "both"):
-        summary["analytic"] = run_analytic(args.output)
+        summary["analytic"] = run_analytic(output)
     if args.mode in ("lbm", "both"):
         summary["lbm"] = run_lbm(args)
-    (args.output / "summary.json").write_text(
+    (output / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    print(f"写入 {args.output/'summary.json'}")
+    print(f"写入 {output/'summary.json'}")
     return 0
 
 

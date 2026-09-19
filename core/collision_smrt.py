@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 
@@ -35,6 +36,33 @@ class CollisionDiagnostics:
     min_f_post: float
     min_g_post: float
     clipping_used: bool = False
+
+
+@lru_cache(maxsize=12)
+def _fixed_zero_lower_projector(c_values, weights, kind):
+    """零低阶矩时，中心矩约束等价于原始矩约束；无需逐格解 Gram 系统。
+
+    平移热流基只增加二阶及以下多项式，其增量矩全为零。因此这是原最小
+    范数投影的代数等价实现，不将实际流速近似为零。缓存按格子内容区分。
+    """
+    c, w = np.asarray(c_values), np.asarray(weights)
+    x, y = c[:, 0], c[:, 1]
+    rows = [np.ones_like(x), y, x]
+    start = 1
+    if kind != 'first':
+        rows += [y*y, x*y, x*x]
+        start = 3
+    if kind == 'heat':
+        rows += [.5*(x*x+y*y)*y, .5*(x*x+y*y)*x]
+        start = 6
+    basis = np.stack(rows)
+    wb = basis*w
+    return np.linalg.solve(wb @ basis.T, wb)[start:]
+
+
+def _project_zero_lower(delta, lattice, kind, start):
+    projector = _fixed_zero_lower_projector(tuple(map(tuple, lattice.c)), tuple(lattice.w), kind)
+    return np.einsum('...i,ia->...a', delta[..., start:], projector)
 
 
 def _central_second_moment_matrix(lattice: Lattice, u: np.ndarray) -> np.ndarray:
@@ -69,6 +97,8 @@ def _weighted_minimum_norm_second_order_delta(
     while minimizing the weighted population norm set by the lattice weights.
     """
 
+    if not np.any(delta_moments[..., :3]):
+        return _project_zero_lower(delta_moments, lattice, 'second', 3)
     basis = _central_second_moment_matrix(lattice, u)
     weighted_basis = basis * lattice.w
     gram = np.einsum("...ia,...ja->...ij", weighted_basis, basis)
@@ -92,6 +122,8 @@ def _weighted_minimum_norm_first_order_delta(
 ) -> np.ndarray:
     """Project g first-order central internal-energy flux to populations."""
 
+    if not np.any(delta_moments[..., :1]):
+        return _project_zero_lower(delta_moments, lattice, 'first', 1)
     basis = _central_first_moment_matrix(lattice, u)
     weighted_basis = basis * lattice.w
     gram = np.einsum("...ia,...ja->...ij", weighted_basis, basis)
@@ -134,6 +166,8 @@ def _weighted_minimum_norm_heat_flux_delta(
 ) -> np.ndarray:
     """Project f third-order translational heat flux to populations."""
 
+    if not np.any(delta_moments[..., :6]):
+        return _project_zero_lower(delta_moments, lattice, 'heat', 6)
     basis = _central_heat_flux_moment_matrix(lattice, u)
     weighted_basis = basis * lattice.w
     gram = np.einsum("...ia,...ja->...ij", weighted_basis, basis)

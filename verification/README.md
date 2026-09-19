@@ -15,6 +15,9 @@
 | [test_phase2_d2q37_fallback.py](test_phase2_d2q37_fallback.py) | D2Q37 静态矩与对偶速度 |
 | [test_phase3_film_ode.py](test_phase3_film_ode.py) | 薄膜 ODE 制造解与幅相 |
 | [test_lim2013.py](test_lim2013.py) | Lim 2013 精确解自洽、Eq. (22) 的适用频段与 1 MHz 失效、紧致热层恒等式、Rayleigh 距离复现论文数字、本仓链路与 Eq. (22) 的比值等于闭式 EOS 常数 |
+| [test_lim_nearfield_diagnostics.py](test_lim_nearfield_diagnostics.py) | 专项对照使用实际 LBM EOS；区间热流采用中点相位；从精确出射分支核查热流—压力符号 |
+| [test_planar_open.py](test_planar_open.py) | 法向禁止回绕、三层链接覆盖、静止态不发声、壁质量/开放能量审计、独立脉冲反射 |
+| [test_collision_projection.py](test_collision_projection.py) | 固定投影缓存与原中心矩 Gram 求解在非零速度下逐布居等价 |
 | [test_phase4_kirchhoff.py](test_phase4_kirchhoff.py)、[test_phase4_d3_compact_source.py](test_phase4_d3_compact_source.py) | 远场核与紧致源的制造解（远场本身未认证） |
 | [test_phase1_*.py](test_phase1_constants.py) | 所选参考工具的代数与相位回归 |
 | [shear_wave_measurement.py](shear_wave_measurement.py)、[thermal_diffusion_measurement.py](thermal_diffusion_measurement.py)、[acoustic_wave_measurement.py](acoustic_wave_measurement.py)、[local_transport_measurement.py](local_transport_measurement.py) | 剪切黏性、热扩散、声速/衰减、局部输运的动态测量器（被上面的测试调用） |

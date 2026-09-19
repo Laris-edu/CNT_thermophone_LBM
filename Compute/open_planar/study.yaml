@@ -1,0 +1,61 @@
+# 配置入口：同一专题共用物性，按批次保存结果；频率是温度/声学频率。
+base_config: ../../configs/gas_air_10k_d2q37_qmatched_local_transport.yaml
+
+defaults:
+  mode: thermal
+  frequency_Hz: 50000.0
+  amplitude_K: 0.1
+  refine: 4
+  length_m: 0.001
+  cycles: 6
+  ramp_cycles: 2
+  probes_m: [0.00012, 0.00030, 0.00060]
+  sampling:
+    profile_cycles: 2
+    profile_samples_per_cycle: 128
+  analysis:
+    harmonics: 3
+    detrend_order: 1
+    window_cycles: 1
+    amplitude_percent: 5
+    phase_deg: 5
+    stationary_relative: 0.01
+    reflection_ratio: 0.01
+    wall_mass_lu: 1.0e-12
+    mass_residual_lu: 1.0e-10
+    energy_residual_J_m2: 1.0e-10
+    cumulative_mass_lu: 1.0e-8
+    cumulative_energy_J_m2: 1.0e-8
+  pulse:
+    epsilon: 1.0e-5
+    center_fraction: 0.3
+    width_fraction: 0.045
+    probe_fraction: 0.65
+    duration_crossings: 1.65
+    window_fraction: 0.16
+
+# 显式算例：--case pulse_r1 可单独运行，适合先检查入口。
+cases:
+  - name: pulse_r1
+    mode: pulse
+    refine: 1
+  - name: pulse_r4
+    mode: pulse
+    refine: 4
+  - name: f50000_r2_long
+    refine: 2
+    length_m: 0.002
+    cycles: 4
+
+# 扫描组采用参数笛卡尔积。生成名称如 grid__frequency_Hz_50000__refine_1。
+sweeps:
+  - name: grid
+    parameters:
+      frequency_Hz: [50000]
+      refine: [1, 2, 4]
+  - name: frequency
+    parameters:
+      frequency_Hz: [75000, 100000]
+    overrides:
+      refine: 4
+      cycles: 4

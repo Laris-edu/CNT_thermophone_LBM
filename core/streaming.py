@@ -49,3 +49,20 @@ def pull_stream_fg(
         pull_stream(f, lattice=lattice, y_axis=y_axis, x_axis=x_axis),
         pull_stream(g, lattice=lattice, y_axis=y_axis, x_axis=x_axis),
     )
+
+
+def pull_stream_open_y(distribution: np.ndarray, *, lattice: Lattice) -> np.ndarray:
+    """x 周期、y 不回绕；越界入射链接留 NaN，必须由边界逐一补全。
+
+    仅接受 (ny, nx, Q)。NaN 哨兵防止多速格子的第二、第三层漏填后静默运行。
+    """
+    dist = np.asarray(distribution, dtype=float)
+    if dist.ndim != 3 or dist.shape[-1] != lattice.q:
+        raise ValueError("open streaming requires (ny, nx, Q)")
+    out = np.full_like(dist, np.nan)
+    ny = dist.shape[0]
+    for a, (cx, cy) in enumerate(lattice.c.astype(int)):
+        lo, hi = max(0, cy), min(ny, ny + cy)
+        if lo < hi:
+            out[lo:hi, :, a] = np.roll(dist[lo-cy:hi-cy, :, a], cx, axis=1)
+    return out
