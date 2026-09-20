@@ -12,16 +12,11 @@ from core.unit_mapping import create_unit_mapping, local_transport_coefficients
 from config_io import load_config
 
 
-CONFIG = Path(__file__).resolve().parents[1] / "configs/gas_air_10k_d2q37_qmatched_analytic_stress.yaml"
+CONFIG = Path(__file__).resolve().parents[1] / "configs/gas_air_10k_d2q37_qmatched_local_transport.yaml"
 
 
 def local_config(model="sutherland"):
     cfg = load_config(CONFIG)
-    m = create_unit_mapping(cfg)
-    # 固定 D/S 与温度单位决定 cp；避免参考物性原有的 0.16% 舍入不一致。
-    cfg["physical"]["cp_J_kgK"] = (m.lattice.D + m.lattice.S + 2) / 2 * m.velocity_scale**2 / m.temperature_scale
-    cfg["physical"].pop("alpha0_m2_s")
-    cfg["physical"].pop("Pr")
     cfg["transport"] = {"mode": "local", "model": model,
                         "sutherland_mu_K": 111.0, "sutherland_k_K": 194.0}
     cfg["numerics"].update(nx=3, ny=2)
@@ -127,16 +122,43 @@ def test_reference_state_recovers_reference_tau_and_nonzero_bulk_scales_locally(
     assert b.tau22 - .5 == pytest.approx(.5 * (m.tau22 - .5))
 
 
-@pytest.mark.parametrize("mode", ["frozen", "local"])
-def test_hdf5_export_preserves_fields_and_transport_metadata(tmp_path, mode):
-    cfg = local_config() if mode == "local" else load_config(CONFIG)
+@pytest.mark.parametrize("model", ["constant", "sutherland"])
+def test_hdf5_export_preserves_fields_and_transport_metadata(tmp_path, model):
+    cfg = local_config(model)
     s = GasSolver2D(cfg)
     s.initialize_from_macro(1., np.zeros(2), s.mapping.theta_ref_lu)
     s.step(2)
-    path = tmp_path / f"{mode}.h5"
+    path = tmp_path / f"{model}.h5"
     s.save_hdf5(str(path))
     with h5py.File(path, "r") as data:
-        assert data.attrs["transport_mode"] == mode
-        assert data["metadata/unit_mapping"].attrs["tau_metadata_scope"] == ("reference_state" if mode == "local" else "constant")
+        assert data.attrs["transport_mode"] == "local"
+        assert data.attrs["transport_model"] == model
+        assert data["metadata/unit_mapping"].attrs["tau_metadata_scope"] == "reference_state"
         np.testing.assert_array_equal(data["fields/f"][:], s.f)
         np.testing.assert_allclose(data["fields/q_lu"][:], s.get_heat_flux_lu())
+
+
+@pytest.mark.parametrize("transport", [None, {}, {"model": "sutherland"}, {"mode": "frozen"}])
+def test_retired_or_implicit_transport_cannot_run_as_current_physics(transport):
+    cfg = local_config()
+    if transport is None:
+        cfg.pop("transport")
+    else:
+        cfg["transport"] = transport
+    with pytest.raises(ValueError, match="transport.mode.*local"):
+        GasSolver2D(cfg)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("regularized_heat_flux_factor", -.87),
+    ("regularized_heat_flux_factor_policy", "specified"),
+    ("conductive_heat_flux_moment_factor", .0635448),
+    ("conductive_heat_flux_moment_factor_policy", "specified"),
+    ("conductive_heat_flux_galilean_correction_factor", .038),
+    ("heat_flux_retention_policy", "specified"),
+])
+def test_retired_heat_flux_knobs_are_rejected_instead_of_silently_ignored(key, value):
+    cfg = local_config()
+    cfg["collision"][key] = value
+    with pytest.raises(ValueError, match=key):
+        GasSolver2D(cfg)

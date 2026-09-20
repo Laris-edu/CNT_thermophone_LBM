@@ -191,67 +191,19 @@ def run_levelc_predictor_corrector(
     q_extraction: str | None = None,
     q_feedback_scale: float = 1.0,
 ) -> LevelCCouplingResult:
-    """运行膜气耦合；默认 conservative + mass_neutral。
+    """运行膜气耦合；默认 conservative + mass_neutral + row1。
 
-    新默认通过热壁实际能量交换联立求膜温，不使用row1矩反馈或松弛。
-    q_g_one_sided_si[1:] 为前一区间平均值，必须在区间中点拟合，能量积分
-    为 sum(q[1:]*dt)，不能按端点量再次作梯形积分。旧scheme的下列说明
-    仅保留溯源；旧“certified”措辞不构成本项目认证。
+    保守路线用实际壁面能量交换联立求膜温，仅支持封闭对称双侧设置。
+    q_g_one_sided_si[1:] 是前一区间平均热流，须在中点拟合，能量用
+    sum(q[1:]*dt) 积分；不接受反馈增益、时间滤波或 row1 传导矩替代。
 
-    ``wall_bc`` selects the thermal wall boundary condition:
-    ``"equilibrium_clamp"`` (P3-4 default; static macrostate smoke), ``"thermal_grad"``
-    (P3-5+ Grad/regularized wet-node wall that resolves the dynamic near-wall admittance),
-    or ``"mass_neutral"`` (Phase_5 G1-W certified production wall, v1.1 symmetric
-    double-sided mass-neutral Grad wall — certified caliber is ``grad_extrap="row1"``;
-    added for G1b, contract §6.3; defaults and existing paths are byte-identical).
-    ``q_feedback_relax`` temporally under-relaxes the q_g fed to the film ODE; it damps the
-    step-to-step (Nyquist) coupling instability of ``thermal_grad`` without affecting the
-    physical (10 kHz) signal. ``1.0`` (no relaxation) reproduces the P3-4 clamp behaviour;
-    ``thermal_grad`` needs a small value (~0.02). ``grad_extrap`` is the near-wall
-    non-equilibrium extrapolation for the Grad wall (``"linear"`` or ``"row1"``).
-
-    ``q_extraction`` selects the one-sided gas flux the film ODE integrates:
-    ``"moment_row"`` (M3 lineage and the ONLY production-certified feedback: near-wall
-    moment-channel conductive flux; on the mass-neutral wall's field shape it reads ~3x
-    low — G1-W §23 archived complex constant — which G1b handles on the REFERENCE side
-    in the frequency domain, where the coupled-run energy-channel admittance cancels the
-    miscalibration exactly) or ``"energy_balance"`` (sealed-box identity
-    ``q_side = (N dy / (2(gamma-1))) dp_mean/dt`` — DIAGNOSTIC ONLY: feeding the
-    time-domain derivative of the resonant box-mean pressure into the film SELF-EXCITES
-    through the acoustic box modes (derivative gain ~ omega_box outruns the relax
-    low-pass; measured in the G1b smoke: predictor-corrector delta growth ~25x/period,
-    H2 ~ 0.38), so it must not be used for production coupling without a dedicated
-    stabilization design).
-
-    ``"hybrid_ac_dc"`` (G1b fourth design, user decision D5-4, v2) composes the feed
-    from the two channels' respective validity domains. AC = scaled moment channel
-    minus its own trailing-period mean (removes the DC whose sign is INVERTED on the
-    mass-neutral field shape — the measured runaway driver). DC = PHYSICAL PINNING,
-    ``q_dc = G_DC (T_s - Tbar_box)`` with ``Tbar_box = T0 * Pbar/p(0)`` (sealed
-    ideal gas on the trailing-period-mean box pressure) and ``G_DC = k_g/(H/2)`` the
-    analytic quasi-static half-box conductance. Design rationale: v1 (period-mean
-    energy-identity DIFFERENCING) was measured delay-unstable — the box's intrinsic
-    DC time constant C_A/(2 G_DC) ~ 0.4 us is ~1000x shorter than the one-period
-    estimator delay, so the delayed difference loop oscillates (smoke growth 6.75).
-    v2 has no delayed self-feedback: the state's own term is instantaneous (pure
-    stable relaxation), only the slowly-drifting TARGET is smoothed; at P_mean=0 the
-    DC equilibrium (T_s -> Tbar_box) is independent of the G_DC value, so G_DC is a
-    pinning-stiffness model constant, not a tunable. At 1f the trailing-period mean
-    of a harmonic vanishes identically, so the as-built AC reference is unchanged
-    (the instantaneous-T_s pinning term adds a real conductance G_DC to the AC loss —
-    included in the as-built denominator by the caller).
-
-    ``q_feedback_scale`` is a REAL gain applied to the extracted flux before the relax
-    filter (default 1.0 = byte-identical legacy behaviour). Purpose (G1b, §23
-    pre-registered wall-change recalibration): on the mass-neutral wall's field shape
-    the moment channel under-reads the true energy flux by the G1-W archived constant
-    (|recal|=3.055); feeding the film the unscaled moment flux under-counts its loss
-    term ~3x and — the sealed rig having NO implicit sink (unlike the
-    pressure-preserving wall's mass-exchange leak) — produces a secular thermal
-    runaway (+215 K over 3 production periods, measured in the first B-machine G1b
-    attempt). The real gain restores the loss-term MAGNITUDE (DC closure has no
-    phase); the archived +17.5deg phase residual is an as-built AC characteristic
-    handled on the reference side.
+    heun、heun_picard1、explicit_lagged 是保留的旧诊断路线，不代表当前
+    算例的推荐耦合。它们可选择 equilibrium_clamp、thermal_grad 或
+    mass_neutral 壁，grad_extrap 选择 linear/row1 非平衡外推；
+    q_extraction 可用 moment_row、energy_balance 或 hybrid_ac_dc。
+    这些量分别是近壁传导矩、闭域能量估计和混合诊断反馈，不能混称
+    保守壁面交换；旧路线的 q_feedback_scale/q_feedback_relax 也不能用来
+    标定当前物理结果。历史分支与参数保留供诊断，不继承旧仓认证结论。
     """
 
     if wall_bc is None:

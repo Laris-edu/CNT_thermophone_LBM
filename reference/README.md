@@ -4,7 +4,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| [continuum_1d_freq.py](continuum_1d_freq.py) | 一维 NSF 频域解（`solve_level_C_frequency`），近膜链路的独立对照，匹配实际 EOS/cp/k 与 D2 纵向黏度 |
+| [continuum_1d_freq.py](continuum_1d_freq.py) | 一维半解析热声参照（`solve_level_C_frequency`），组合热导纳与解析声压剖面；不是独立离散的完整 NSF 求解器 |
 | [lim2013.py](lim2013.py) | Lim/Tong/Li JSV 2013 悬空 CNT 薄膜热声源的精确解（Eqs. 8-16）与近似解（Eqs. 17-23）+ Rayleigh 距离；近/远场对照的权威参照 |
 | [analytical_models.py](analytical_models.py) | 解析热声模型（含指数热模态声压源项）；薄热层、无黏近似 |
 | [thermal_admittance.py](thermal_admittance.py) | 半空间热导纳 |

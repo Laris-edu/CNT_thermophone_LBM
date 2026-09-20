@@ -1,0 +1,58 @@
+# 局部物性热 LBM：mu(T)、k(T) 为 Sutherland，nu=mu/rho，alpha=k/(rho*cp)。
+# 每一步按局部热力学 theta 更新 tau21/tau32 与热流系数；dx/dt/速度集固定。
+# 参考 mu0=rho0*nu0；Sutherland 常数取空气 111 K / 194 K。
+# 来源：https://doc.comsol.com/6.4/doc/com.comsol.help.cfd/cfd_ug_fluidflow_high_mach.08.46.html
+# cp 与 c0=347、gamma=1.4、T0=300 和固定 D/S 保持一致；alpha/Pr 自动计算。
+# 零体黏度保持 tau22=0.5。范围：本次验证的周期体内输运；壁面需另验。
+case:
+  name: gas_air_10k_d2q37_qmatched_local_transport
+  purpose: 随局部密度和温度更新物性及中心矩松弛时间
+
+physical:
+  T0_K: 300.0
+  p0_Pa: 101325.0
+  rho0_kg_m3: 1.177
+  c0_m_s: 347.0
+  gamma: 1.4
+  cp_J_kgK: 1003.4083333333333
+  kg_W_mK: 0.0263
+  nu0_m2_s: 1.57e-5
+
+lattice:
+  velocity_set: D2Q37
+  Q: 37
+  D: 2
+  S: 3
+  dx_m: 2.61175e-6
+  dt_s: 7.440476190476191e-09
+  theta_q_lu: 0.6979533220196852
+  theta_ref_policy: physical_sound_speed
+  theta_transport_policy: theta_ref_lu
+  rho_ref_lu: 1.0
+
+transport:
+  mode: local
+  model: sutherland   # constant 可保持动态黏度/热导率恒定，仍按局部 rho/theta 更新 tau
+  sutherland_mu_K: 111.0
+  sutherland_k_K: 194.0
+
+collision:
+  bulk_viscosity_policy: diagnostic_zero
+  nu_b_lu: auto
+  central_moment_closure: second_order
+  high_order_relaxation: 1.0
+  trace_bulk_policy: tau22
+  trace_bulk_scale: 1.0
+  deviatoric_stress_policy: measured
+  regularized_shear_xy_factor: 1.0
+  regularized_shear_normal_factor: 1.0
+  regularized_heat_flux_f_fraction: 0.5714285714285714
+  # local 模式统一计算 h=1-1/tau32、q_factor=1-1/(2*tau32)，无需标定常数。
+
+numerics:
+  precision: float64
+  streaming: pull
+  boundary: periodic
+  nx: 128
+  ny: 4
+  steps: 400

@@ -1,4 +1,4 @@
-"""解析应力配置的动态回归：检查真实声波演化，避免仅验证配置字面值。"""
+"""局部输运基线的实测应力回归：检查声波、剪切波与热扩散的真实演化。"""
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +12,7 @@ from verification.shear_wave_measurement import ShearWaveSettings, measure_shear
 from verification.thermal_diffusion_measurement import ThermalDiffusionSettings, measure_thermal_diffusion_direction
 
 
-CONFIG = Path(__file__).resolve().parents[1]/'configs/gas_air_10k_d2q37_qmatched_analytic_stress.yaml'
+CONFIG = Path(__file__).resolve().parents[1]/'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
 
 
 def test_small_k_acoustic_attenuation_matches_configured_zero_bulk_target():

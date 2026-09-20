@@ -3,7 +3,6 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import platform
 import time
@@ -25,14 +24,6 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def source_reference(snapshot, output):
-    """Use a portable relative reference, or an absolute path across Windows drives."""
-    try:
-        return Path(os.path.relpath(snapshot,output)).as_posix()
-    except ValueError:
-        return Path(snapshot).resolve().as_posix()
-
-
 def _summary(data, config, previous=None):
     mapping=create_unit_mapping(config)
     run=config['run']
@@ -44,7 +35,7 @@ def _summary(data, config, previous=None):
 
 
 def run_case(effective, output, *, source_cache=None, provenance=None):
-    """Run a fully resolved configuration into a NEW directory. Never overwrites data."""
+    """Run into a NEW directory. The retired source_cache argument is ignored."""
     config=deepcopy(effective)
     validate_effective(config)
     output=Path(output).resolve()
@@ -52,17 +43,14 @@ def run_case(effective, output, *, source_cache=None, provenance=None):
         raise FileExistsError(f'case already exists: {output}')
     # Provenance is prepared before creating the case directory; it is shared per batch.
     source=deepcopy(provenance if provenance is not None else
-        capture_source(ROOT,source_cache or ROOT/'Compute/_sources'))
+        capture_source(ROOT))
     for name,digest in source['source_sha256'].items():
         if hashlib.sha256((ROOT/name).read_bytes()).hexdigest()!=digest:
             raise RuntimeError('source changed during the batch; use a new process/batch')
-    snapshot=source.pop('snapshot')
-    if snapshot:
-        snapshot=source_reference(snapshot,output)
     run=config['run']; started=time.perf_counter()
     manifest=dict(created_utc=_now(),finished_utc=None,status='running',elapsed_s=None,
         python=platform.python_version(),numpy=np.__version__,pyyaml=yaml.__version__,
-        source_snapshot=snapshot,**source,
+        **source,
         args=dict(mode=run['mode'],refine=run['refine'],length=run['length_m'],frequency=run['frequency_Hz'],
             amplitude=run['amplitude_K'],cycles=run['cycles'],ramp_cycles=run['ramp_cycles'],output=str(output)),
         pressure='direct rho*theta; no heat-flux conversion',
@@ -113,8 +101,9 @@ def plan_study(path, batch, selected=None):
 
 
 def run_study(path,batch,*,selected=None,source_cache=None):
+    """Run selected cases; source_cache is retained only as an ignored legacy argument."""
     jobs=plan_study(path,batch,selected)
-    source=capture_source(ROOT,source_cache or ROOT/'Compute/_sources')
+    source=capture_source(ROOT)
     return [run_case(config,output,provenance=source) for config,output in jobs]
 
 

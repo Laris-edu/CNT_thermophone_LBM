@@ -2,8 +2,6 @@
 
 | 文件 | 用途 |
 |---|---|
-| [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | 当前阅读入口与关注任务，不沿用旧仓的阶段验收声明 |
-| [CHAIN.md](CHAIN.md) | 主链路接口与数值约定 |
 | [PROVENANCE.md](PROVENANCE.md) | 迁移时的来源、删除项及等价性证据 |
 | [migration_manifest.json](migration_manifest.json) | 迁移逐文件哈希，历史记录 |
 | [LIM_NEARFIELD_20260918.md](LIM_NEARFIELD_20260918.md) | Lim 原文核查、近场 LBM 对照与网格诊断 |

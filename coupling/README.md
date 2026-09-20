@@ -10,4 +10,4 @@
 | [drive.py](drive.py) | SI 面功率驱动信号（正弦/阶跃/高斯），允许有符号功率 |
 | [energy_audit.py](energy_audit.py) | 区间能量审计结果类型与容差比较 |
 
-接口细节与限制见 [docs/CHAIN.md](../docs/CHAIN.md)。
+接口细节与限制见根 [README](../README.md)。

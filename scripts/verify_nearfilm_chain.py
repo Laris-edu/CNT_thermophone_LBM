@@ -4,13 +4,11 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 import sys
 import time
 import traceback
-from zipfile import ZipFile, ZIP_DEFLATED
 
 import numpy as np
 from scipy.integrate import solve_bvp
@@ -27,6 +25,7 @@ from postproc.multiharmonic_fit import fit_multiharmonic
 from reference.constants import PhysicalParams
 from reference.continuum_1d_freq import solve_level_C_frequency
 from simulation.output import OutputLayout
+from simulation.provenance import capture_source
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / 'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
@@ -236,15 +235,8 @@ def main():
         thresholds=dict(window_complex_relative=0.01,film_energy_relative=0.01,
                         interface_energy_relative=0.05,reference_amplitude_relative=0.05,
                         reference_phase_deg=5.0),
-        source_sha256={})
-    files = [ROOT/'config_io.py', ROOT/'scripts/output_layout.py', Path(__file__).resolve(),args.config]
-    for folder in ['core','boundary','coupling','phase3_interfaces','postproc','reference','simulation']:
-        files.extend(sorted((ROOT/folder).glob('*.py')))
-    summary['source_sha256'] = {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
+        **capture_source(ROOT))
     (output/'manifest.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
-    with ZipFile(output/'source_snapshot.zip','w',ZIP_DEFLATED) as archive:
-        for relative in summary['source_sha256']:
-            archive.write(ROOT/relative,relative)
     steps = int(round(args.cycles/(args.frequency*mp.lattice.dt_s)))
     summary['n_steps'] = steps
     print(f'{args.mode}, wall={args.wall}, nx={solver.nx}, ny={solver.ny}, steps={steps}, '

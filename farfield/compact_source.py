@@ -1,32 +1,17 @@
-"""P4-D3 compact-source map: certified near-wall temperature -> thermoacoustic pumping velocity.
+"""半空间薄热层的解析紧致源模型：壁温复幅值 → 热膨胀泵送速度。
 
-Project: docs/Phase_4/M4/P4_D3_Multidomain_Acoustic_Project.md (D3-4, section 12).
+采用 x(t)=Re[x_hat exp(+i Omega t)]。常物性扩散温度为
+T_hat(y)=T_s_hat exp(-(1+i)y/delta_T)，delta_T=sqrt(2 alpha/Omega)。
+由近似等压热层的膨胀积分得到
 
-The D3-4 handoff verdict (section 12): the fine/M3 domain must NOT hand its emission to the
-coarse acoustic domain by radiating it (the volume-injection floor swamps the physical wave
-31-57x); instead the M3-certified near-wall state determines the source strength analytically
-and the one-way soft source (section 11) injects it. This module is that map -- the single
-source of truth for the formula (the extraction probe imports it, so the on-stack fit in
-scripts/phase4_d3_source_extraction_probe.py genuinely tests THIS code).
+    u_src = (1+i)/2 * Omega * delta_T * T_s_hat/T0,
+    p_src = rho0*c0*u_src.
 
-Physics (half-space oscillating wall temperature, x(t)=Re[x_hat exp(+i Omega t)] convention,
-frozen since P3-0): the wall imposes T'(0,t)=Re[T_s_hat e^{i Omega t}]; the gas temperature is
-the decaying diffusion wave T_hat(y) = T_s_hat exp(-(1+i) y/delta_T), delta_T = sqrt(2 alpha/
-Omega). The layer expands isobarically, d u/d y = (1/T0) dT'/dt, so the pumping velocity above
-the layer is the layer integral
-
-    u_src = (i Omega/T0) * Integral T_hat dy = (1+i)/2 * Omega delta_T * (T_s_hat/T0),
-
-i.e. |u_src| = Omega delta_T/sqrt(2) * |T_s_hat|/T0 leading T_s_hat by +45 deg. The one-way
-soft source then injects the outgoing plane wave dp_hat = Z0 * u_src (per side; a freestanding
-film pumps both sides symmetrically -- the upper-side handoff carries NO factor 2; the film
-energy bookkeeping's 2 q_g'' double-sided factor lives in the film ODE, not here).
-
-Validity/error budget (documented, not hidden): u_src inherits the Level C T_s_hat +/-5.4%
-amplitude / ~2 deg phase band linearly; the map itself is leading-order half-space theory --
-isobaric-layer and compactness corrections are O(k delta_T) ~ 5e-3 at 10 kHz (negligible
-against the +/-5.4% band); the M4 amplitude reference remains contract section 10.3 R0/R1/R2,
-never this closed form used as its own truth."""
+该式是单侧平面出射源，双侧热损因子属于膜 ODE，不在此重复乘 2。
+模型依赖常物性、半空间、近似等压薄热层和紧致源假设。这里的单元测试
+检查公式、相位和缩放；不构成当前 LBM 近场到远场的全链路验证，
+也不能用同一解析公式作为自身的独立声压精度证据。
+"""
 
 from __future__ import annotations
 

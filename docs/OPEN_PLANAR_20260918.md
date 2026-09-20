@@ -140,7 +140,7 @@ python -m scripts.verify_planar_open --mode pulse --refine 4 --output Compute/op
 
 `--output` 指批次根目录，数据写入其 `raw/`。两条命令均要求新的数据目录；
 也可在同一批次中用 `--case <算例名>` 区分算例。常规配置运行使用 `scripts.run_compute`；
-未提交代码的共享归档统一放在 `Compute/_sources/`，完整说明见根 README。
+运行时只记录版本信息与公共源码哈希，不创建源码归档；完整说明见根 README。
 默认 refine=4、给温算例运行六周期，细网格在本次 CPU/NumPy
 实现上属于长算例，逐周期输出进度。完整回归为 `python -m pytest -q`。
 图表入口为 `scripts.plot_planar_open`，`--input` 与 `--output` 均可用正式批次根目录。

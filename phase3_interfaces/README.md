@@ -4,7 +4,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| [heat_flux_extraction.py](heat_flux_extraction.py) | 壁面传导热流提取与 LU→SI 转换；显式传当前配置时接 local 热流系数，测的是传导矩 |
+| [heat_flux_extraction.py](heat_flux_extraction.py) | 传当前配置时使用 local 热流系数，测的是传导矩；无配置默认 D2Q37 原始中心矩，不能作为已修正的物理热流 |
 | [wall_state_contract.py](wall_state_contract.py) | 由权威 mapping 转换壁温单位；法向约定限当前上半域 |
 | [complex_amplitude.py](complex_amplitude.py) | 幅相、模态与衰减工具；保持复指数与时间零点约定 |
 

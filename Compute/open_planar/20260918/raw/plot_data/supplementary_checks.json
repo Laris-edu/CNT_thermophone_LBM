@@ -1,0 +1,77 @@
+{
+  "temperature_profiles": [
+    {
+      "case": "f100000_r4",
+      "points": 64,
+      "delta_T_m": 8.419297478874431e-06,
+      "max_temperature_complex_error_over_wall_amplitude": 0.010932774891927604
+    },
+    {
+      "case": "f50000_r1",
+      "points": 23,
+      "delta_T_m": 1.1906684680277827e-05,
+      "max_temperature_complex_error_over_wall_amplitude": 0.12336835803302683
+    },
+    {
+      "case": "f50000_r2",
+      "points": 46,
+      "delta_T_m": 1.1906684680277827e-05,
+      "max_temperature_complex_error_over_wall_amplitude": 0.036233352599773096
+    },
+    {
+      "case": "f50000_r2_long",
+      "points": 46,
+      "delta_T_m": 1.1906684680277827e-05,
+      "max_temperature_complex_error_over_wall_amplitude": 0.0362318706842173
+    },
+    {
+      "case": "f50000_r4",
+      "points": 91,
+      "delta_T_m": 1.1906684680277827e-05,
+      "max_temperature_complex_error_over_wall_amplitude": 0.007944736537346649
+    },
+    {
+      "case": "f75000_r4",
+      "points": 74,
+      "delta_T_m": 9.72176733163138e-06,
+      "max_temperature_complex_error_over_wall_amplitude": 0.009587268602583474
+    }
+  ],
+  "domain_length_comparison": [
+    {
+      "z_m": 0.0001194875625,
+      "start_cycle": 3.0,
+      "end_cycle": 4.0,
+      "amplitude_error_percent": 0.045520543876587105,
+      "phase_error_deg": 0.01517661226575744,
+      "complex_relative_error": 0.0005266937683348821
+    },
+    {
+      "z_m": 0.0002996983125,
+      "start_cycle": 3.0,
+      "end_cycle": 4.0,
+      "amplitude_error_percent": 0.039328258470106014,
+      "phase_error_deg": 0.018618358605486007,
+      "complex_relative_error": 0.0005102022141188748
+    },
+    {
+      "z_m": 0.0006000495625,
+      "start_cycle": 3.0,
+      "end_cycle": 4.0,
+      "amplitude_error_percent": 0.02585561703771777,
+      "phase_error_deg": 0.02130786344840222,
+      "complex_relative_error": 0.000452980119462254
+    }
+  ],
+  "domain_complex_change_below_one_percent": true,
+  "source_summaries": {
+    "f100000_r4": "a9db8cf2618fc118673b070c0fc6285d3e7e47c34578c14d352ec7ea6ac2bcff",
+    "f50000_r1": "3d10101d5ba23c50f7ee33822665e1888bc5f93639161b640c7ab2dfdc1eb457",
+    "f50000_r2": "9164d1fd6d608afc41718be24b9cea137b3993d1d23a7e072c049d2b74f540f8",
+    "f50000_r2_long": "a89d103a59d92f1fc070b33065e5075dc37d52ce99f844bd7973db3f2c59bde0",
+    "f50000_r4": "7f11a3680f81bb8961ae6a6f3170a4434ab026ae23d8d3ee993ec57cc5f200e7",
+    "f75000_r4": "3f43467571db040822ac369016c9b17d868e9a309f911d0689b82666140c758a",
+    "pulse_r1": "7ad6324c3f4010cb2c5a77cb611e8cd0ad9f0c8786e15de2c7672f6b778397cd",
+    "pulse_r4": "56484f98f75928dcfb8389f65078e7a71fcedbbe852f7b872ce4fa3dd17f889a"
+  }
+}

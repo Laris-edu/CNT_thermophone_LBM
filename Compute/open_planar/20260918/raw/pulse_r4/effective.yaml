@@ -1,0 +1,46 @@
+case:
+  name: gas_air_10k_d2q37_qmatched_local_transport
+  purpose: 随局部密度和温度更新物性及中心矩松弛时间
+collision:
+  bulk_viscosity_policy: diagnostic_zero
+  central_moment_closure: second_order
+  deviatoric_stress_policy: measured
+  high_order_relaxation: 1.0
+  nu_b_lu: auto
+  regularized_heat_flux_f_fraction: 0.5714285714285714
+  regularized_shear_normal_factor: 1.0
+  regularized_shear_xy_factor: 1.0
+  trace_bulk_policy: tau22
+  trace_bulk_scale: 1.0
+lattice:
+  D: 2
+  Q: 37
+  S: 3
+  dt_s: 1.8601190476190478e-09
+  dx_m: 6.529375e-07
+  rho_ref_lu: 1.0
+  theta_q_lu: 0.6979533220196852
+  theta_ref_policy: physical_sound_speed
+  theta_transport_policy: theta_ref_lu
+  velocity_set: D2Q37
+numerics:
+  boundary: planar_open_y
+  nx: 1
+  ny: 1532
+  precision: float64
+  steps: 2558
+  streaming: pull
+physical:
+  T0_K: 300.0
+  c0_m_s: 347.0
+  cp_J_kgK: 1003.4083333333333
+  gamma: 1.4
+  kg_W_mK: 0.0263
+  nu0_m2_s: 1.57e-05
+  p0_Pa: 101325.0
+  rho0_kg_m3: 1.177
+transport:
+  mode: local
+  model: sutherland
+  sutherland_k_K: 194.0
+  sutherland_mu_K: 111.0

@@ -1,9 +1,7 @@
-"""Candidate D2Q37 multispeed lattice for the Phase 2 fallback route.
+"""D2Q37 multispeed quadrature, the only supported lattice in this project.
 
-This module starts the D2Q37 / equivalent ninth-order velocity-set path after
-the D2Q21 physical-timestep high-mode failure.  It is wired through the Phase 2
-lattice-family registry for diagnostic runs, but it is not a production
-replacement until dynamic transport validation passes.
+Weights and odd/even moment checks live here; physical transport and unit
+conversion are defined in core.unit_mapping. D2Q21 is retired.
 """
 
 from __future__ import annotations
@@ -47,7 +45,7 @@ def _shell_velocities() -> list[tuple[list[tuple[int, int]], float]]:
 
 
 def make_d2q37(dtype=np.float64) -> LatticeD2Q37:
-    """Return the candidate positive-weight D2Q37 lattice."""
+    """Return the positive-weight D2Q37 lattice."""
 
     velocities: list[tuple[int, int]] = []
     weights: list[float] = []
@@ -84,7 +82,7 @@ def _gaussian_target(exponents: tuple[int, int], theta: float) -> float:
 
 
 def assert_d2q37_moments(tol: float = 1.0e-12) -> None:
-    """Validate the candidate ninth-order symmetry / eighth-order even moments."""
+    """Validate ninth-order symmetry / eighth-order even moments."""
 
     lattice = make_d2q37()
     if lattice.q != 37 or lattice.c.shape != (37, 2) or lattice.w.shape != (37,):

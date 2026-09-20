@@ -1,44 +1,13 @@
-"""Mass-neutral Grad/regularized thermal Dirichlet wall (Phase_5 WP1-3, contract §6.1).
+"""质量中性的 Grad/regularized 给温壁，用于闭域对称双侧保守耦合。
 
-G1-W production-wall candidate. Identical Grad/regularized reconstruction to
-``wall_thermal_grad`` — ``f0 = feq(rho_w, 0, theta_w) + interior-neq copy`` with the
-uniform ``g`` delta pinning the internal energy, so ``theta = theta_w`` and ``u = 0``
-hold exactly and the physical non-equilibrium heat flux is retained (NOT an
-equilibrium clamp) — with exactly ONE change:
+壁行保留流步后的逐列密度，以指定壁温、零速度平衡态和内部邻行的
+非平衡分布重构 f/g，再修正内部能。壁操作不引入净质量源，
+能量变化由 coupling.conservative 计入实际膜气交换，不做正性裁剪。
 
-    rho_w is not prescribed. The wall row keeps the post-stream row-0 density
-    column by column, so the wall operation is **mass-neutral by construction**
-    (its net change of total mass is identically zero up to floating-point
-    summation noise).
-
-Rationale (G1-W risk basis, contract §6.1): the frozen ``pressure_preserving``
-policy sets ``rho_w = p_ref/theta_w`` each step; under ``theta_w = theta0 (1 +
-eps cos)`` this writes an O(eps) 1f plus O(eps^2) DC/2f density source into the
-domain before the equations of motion act. Keeping the streamed density instead
-makes the wall pressure ``p_w = rho_w * theta_w`` a *dynamic* quantity that
-responds to the incident field — physically the correct rigid-wall behaviour
-(the acoustic pressure at a rigid wall oscillates; it is not clamped).
-
-Default OFF everywhere: no frozen config or production path imports this
-module; the M3/M4 stacks stay byte-identical. Production adoption is decided by
-the G1-W gate (WP2), including the small-amplitude admittance regression
-(amplitude <=5%, phase <=5 deg) and the old-vs-new difference audit.
-No clipping / floor / positivity repair is used.
-
-STATUS (2026-07-21, candidate v1, NOT certified): mass metrics are perfect at
-production scale (10 kHz dx2p6 ny=48: flux components <=1.7e-17 vs the 1e-10
-gate, 2-period drift 2.3e-13) and the run is stable, BUT the Level-A-style
-admittance preview reads amplitude -37.9% vs the analytic half-space reference
-(phase +2.65 deg; ratio to the frozen wall 0.656 @ +0.45 deg) — far outside
-the <=5% regression row, so v1 must NOT enter G1a as-is. Open diagnosis
-(Phase5_STATUS §3): (a) instrument — the conduction-moment export factor is a
-narrow-band (tau,k) point calibration made on the pressure-clamped stack, and
-a changed near-wall field structure can misread by O(10%) easily (FD-gradient
-dual-channel discriminator designed); (b) physics — with mass conserved the
-y-periodic rig becomes a genuinely closed box heated from both wrap sides
-(pressure-release vs rigid acoustic character); (c) wall-model deficiency.
-The frozen pressure-preserving wall reproduces the M3 admittance exactly in
-the same probe (-5.32%/+2.198 deg), so the probe chain itself is validated.
+单壁与对称双壁工具均保留；当前保守路线使用对称双壁和 row1 外推。
+这是湿节点闭域边界，不是 boundary.planar_open 的单侧漫反射边界，
+也不意味着近壁传导矩等于实际交换量。历史标定与旧仓阶段结论不适用于
+当前 local 输运模型；行为由当前守恒与耦合回归检查。
 """
 
 from __future__ import annotations
@@ -267,7 +236,7 @@ def make_symmetric_mass_neutral_band_callback(
 ):
     """G4a tent band: the v1.1 symmetric reconstruction at an arbitrary row.
 
-    Same certified construction as ``make_symmetric_mass_neutral_wall_callback``
+    Same reconstruction as ``make_symmetric_mass_neutral_wall_callback``
     (per-direction neq, equilibrium-increment cleanup, exact energy pinning),
     placed at ``row`` on the periodic lattice. Used for the tent rig's ambient
     sink band (row ny//2) and, composed with the row-0 wall, keeps the field

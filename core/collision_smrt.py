@@ -5,7 +5,7 @@
 * 二阶中心矩闭合（``second_order``，唯一保留的闭合阶数）；
 * 偏应力按实测非平衡中心矩以 ``(1 - 1/tau21)`` 松弛（``measured`` 口径）；
 * 迹通道按 ``(1 - 1/tau22)`` 松弛，``nu_b = 0`` 对应 tau22 = 1/2、保留因子 -1；
-* 热流按 ``regularized_heat_flux_factor`` / 局部 ``1 - 1/tau32`` 做最小范数投影；
+* 热流按局部 ``1 - 1/tau32`` 做最小范数投影；
 * 逐格质量、动量和所选总能量守恒，不做正性裁剪。
 
 迁移时删除了不在这条路径上的分支（解析应变率偏应力、四阶闭合、
@@ -211,7 +211,7 @@ def _regularized_f_collision(
     mapping: UnitMapping,
     lattice: Lattice,
     *,
-    transport: LocalTransport | None = None,
+    transport: LocalTransport,
 ) -> np.ndarray:
     """Relax central f moments through second order.
 
@@ -224,8 +224,8 @@ def _regularized_f_collision(
     stress = _nonequilibrium_central_stress(f, f_eq, u, lattice)
     stress_xy = stress[..., 0, 1]
     stress_dev = stress[..., 0, 0] - stress[..., 1, 1]
-    tau21 = mapping.tau21 if transport is None else transport.tau21
-    tau22 = mapping.tau22 if transport is None else transport.tau22
+    tau21 = transport.tau21
+    tau22 = transport.tau22
     shear_factor = 1.0 - 1.0 / tau21
     trace = stress[..., 0, 0] + stress[..., 1, 1]
     # nu_b = 0 对应 tau22 = 1/2，迹保留因子 (1 - 1/tau22) = -1，即零体耗散。
@@ -258,7 +258,7 @@ def _regularized_heat_flux_collision(
     u: np.ndarray,
     mapping: UnitMapping,
     lattice: Lattice,
-    transport: LocalTransport | None = None,
+    transport: LocalTransport,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply regularized total heat-flux content before energy correction.
 
@@ -268,28 +268,17 @@ def _regularized_heat_flux_collision(
     transport mapping decision.
     """
 
-    heat_flux_factor = (mapping.collision.regularized_heat_flux_factor
-                        if transport is None else transport.heat_flux_retention[..., None])
-    if transport is None and heat_flux_factor == 0.0:
-        return f_post, g_eq.copy()
+    heat_flux_factor = transport.heat_flux_retention[..., None]
 
     total_heat_flux = central_energy_flux_lu(f_before, g_before, u=u, lattice=lattice)
     target_heat_flux = heat_flux_factor * total_heat_flux
     f_fraction = mapping.collision.regularized_heat_flux_f_fraction
-    if transport is not None:
-        f_heat_flux = f_fraction * target_heat_flux - _central_translational_energy_flux_lu(
-            f_post,
-            u,
-            lattice,
-        )
-        g_heat_flux = (1.0 - f_fraction) * target_heat_flux - _central_internal_energy_flux_lu(
-            g_eq,
-            u,
-            lattice,
-        )
-    else:
-        f_heat_flux = f_fraction * target_heat_flux
-        g_heat_flux = (1.0 - f_fraction) * target_heat_flux
+    f_heat_flux = f_fraction * target_heat_flux - _central_translational_energy_flux_lu(
+        f_post, u, lattice,
+    )
+    g_heat_flux = (1.0 - f_fraction) * target_heat_flux - _central_internal_energy_flux_lu(
+        g_eq, u, lattice,
+    )
 
     zeros = np.zeros_like(f_heat_flux[..., 0])
     f_delta_moments = np.stack(
@@ -347,18 +336,16 @@ def collide_fg(
     2. Build ``f_eq`` and ``g_eq`` from the same macro state.
     3. Relax central-Hermite f stress content with ``tau21``/``tau22``.
     4. Reconstruct f third-order central translational energy flux and g
-       first-order central internal-energy flux from the configured
-       heat-flux retention factor.
-    5. Correct the zero moment of g by adding ``delta_G * w_a`` so the selected
-       central total energy is exactly conserved per cell.
+       first-order central internal-energy flux from the local tau32.
+    5. Correct the zero moment of g with ``delta_G * f_eq/rho`` so the selected
+       central total energy is conserved without adding a comoving heat flux.
     """
 
     lattice = lattice or make_lattice()
     f = np.asarray(f, dtype=float)
     g = np.asarray(g, dtype=float)
     macro_before = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
-    transport = (local_transport_coefficients(mapping, macro_before.rho, macro_before.theta)
-                 if mapping.transport.mode == "local" else None)
+    transport = local_transport_coefficients(mapping, macro_before.rho, macro_before.theta)
     f_eq, g_eq = equilibrium_fg(
         macro_before.rho,
         macro_before.u,
@@ -392,8 +379,8 @@ def collide_fg(
     macro_mid = recover_macro(f_post, g_shape, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
     delta_G = macro_before.E_tot - macro_mid.E_tot
     # 局部模式在随体参考系交换平动/内部能量：用均值为 u 的分布补能，
-    # 避免静止权重 w 带来额外热流 -u*delta_G。旧模式保留原算术路径。
-    energy_weights = (f_eq / macro_before.rho[..., None]) if transport is not None else lattice.w
+    # 避免静止权重 w 带来额外热流 -u*delta_G。
+    energy_weights = f_eq / macro_before.rho[..., None]
     g_post = g_shape + delta_G[..., None] * energy_weights
 
     if not return_diagnostics:

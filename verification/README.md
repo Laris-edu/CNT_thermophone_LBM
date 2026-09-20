@@ -5,11 +5,11 @@
 | 文件 | 守护什么 |
 |---|---|
 | [test_conservative_chain.py](test_conservative_chain.py) | 膜气能量闭合、膜温与壁温同值、零输入不假失败、非保守组合被拒、声压源项能量极限 |
-| [test_local_handoff.py](test_local_handoff.py) | 非零传导热流的提取与 LU/SI 转换一致 |
-| [test_local_transport.py](test_local_transport.py) | 局部物性本构、均匀/非均匀态的输运系数与 NSF 对照 |
+| [test_local_handoff.py](test_local_handoff.py) | 传导热流与 LU/SI 转换一致；无配置默认 D2Q37 原始矩，显式 D2Q21 被拒绝 |
+| [test_local_transport.py](test_local_transport.py) | 局部物性进入真实碰撞与读出、守恒与元数据；旧固定系数及缺省 frozen 配置被拒绝 |
 | [test_local_transport_dynamics.py](test_local_transport_dynamics.py) | 热稀薄运动气体、有限温差加密、声衰减保持 |
 | [test_quadrature_equilibrium.py](test_quadrature_equilibrium.py) | 平衡态的独立张量展开、矩、正性；退役 D2Q21 立即报错 |
-| [test_analytic_stress_transport.py](test_analytic_stress_transport.py) | 声速/衰减、剪切黏性、热扩散、零梯度下的应力松弛 |
+| [test_stress_transport.py](test_stress_transport.py) | 当前 local 基线的声速/衰减、剪切黏性、热扩散、零梯度下的实测应力松弛 |
 | [test_collision_sign_and_conservation.py](test_collision_sign_and_conservation.py) | 实测偏应力的 Navier–Stokes 符号、非平凡扰动下的逐格守恒 |
 | [test_multiharmonic_fit.py](test_multiharmonic_fit.py) | 联合谐波拟合器在合成信号上的正确性 |
 | [test_phase2_d2q37_fallback.py](test_phase2_d2q37_fallback.py) | D2Q37 静态矩与对偶速度 |

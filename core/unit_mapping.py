@@ -6,7 +6,7 @@ modules consume :class:`UnitMapping` and must not recompute ``nu_lu``,
 ``tau32`` directly.
 
 只保留本项目实际运行的碰撞配置：二阶中心矩闭合、measured 偏应力、tau22 迹通道、
-局部或显式指定的热流系数。迁移时删除了其它路线的机构（ghost_orthogonal_local*
+局部输运和从局部 tau32 推导的热流系数。迁移时删除了其它路线的机构（ghost_orthogonal_local*
 迹策略族、四阶闭合、解析应变率偏应力、DC/A/H 退役旋钮、alpha_repair_scale 旁路
 以及三个无调用的配置工厂）。旧配置若仍写着这些旋钮，``create_unit_mapping`` 按
 ``_RETIRED_COLLISION_VALUES`` 明确报错，不会静默按新内核重跑。
@@ -27,8 +27,8 @@ BULK_VISCOSITY_POLICY_DIAGNOSTIC_ZERO = "diagnostic_zero"
 BULK_VISCOSITY_POLICY_SPECIFIED = "specified"
 HEAT_FLUX_TAU32_RELATION = (
     "alpha_lu = theta_transport_lu * (tau32 - 0.5); "
-    "regularized_heat_flux_factor is a lattice-family projection closure h(tau32), "
-    "not an independent transport knob"
+    "local heat-flux retention = 1 - 1/tau32; "
+    "local conductive readout = 1 - 1/(2*tau32); not independent transport knobs"
 )
 # 已退役内核的碰撞旋钮：只有当取值与本内核唯一支持的行为不同时才报错，
 # 即"旧配置被静默按新内核重跑"的正是这种情况。
@@ -45,8 +45,13 @@ _RETIRED_COLLISION_VALUES: dict[str, tuple[Any, ...]] = {
     "seam_aware_bottom_rows": (0,),
     "seam_aware_top_rows": (0,),
     "seam_aware_taper_rows": (0,),
-    "heat_flux_retention_policy": ("specified",),
 }
+# 不再接受固定热流系数，也不静默忽略旧标定值。参考态派生值仍写入元数据。
+_RETIRED_HEAT_FLUX_KEYS = (
+    "regularized_heat_flux_factor", "regularized_heat_flux_factor_policy",
+    "conductive_heat_flux_moment_factor", "conductive_heat_flux_moment_factor_policy",
+    "conductive_heat_flux_galilean_correction_factor", "heat_flux_retention_policy",
+)
 
 
 @dataclass(frozen=True)
@@ -82,10 +87,11 @@ class CollisionScales:
     bulk_viscosity_policy: str = BULK_VISCOSITY_POLICY_DIAGNOSTIC_ZERO
     nu_b_lu: float | str = "auto"
     trace_bulk_scale: float = 1.0
-    regularized_heat_flux_factor_policy: str = "specified"
+    # 以下热流系数仅记录参考态，不是运行时可调参数。
+    regularized_heat_flux_factor_policy: str = LOCAL_TAU_POLICY
     regularized_heat_flux_factor: float = 0.0
     regularized_heat_flux_f_fraction: float = 0.5714285714285714
-    conductive_heat_flux_moment_factor_policy: str = "specified"
+    conductive_heat_flux_moment_factor_policy: str = LOCAL_TAU_POLICY
     conductive_heat_flux_moment_factor: float = 1.0
     conductive_heat_flux_galilean_correction_factor: float = 0.0
 
@@ -94,7 +100,7 @@ class CollisionScales:
 class TransportScales:
     """局部输运本构；单位换算始终固定，cp 由固定 D/S 和温度单位约束。"""
 
-    mode: str = "frozen"
+    mode: str = "local"
     model: str = "sutherland"
     sutherland_mu_K: float = 111.0
     sutherland_k_K: float = 194.0
@@ -147,7 +153,7 @@ class UnitMapping:
             "transport_sutherland_mu_K": self.transport.sutherland_mu_K,
             "transport_sutherland_k_K": self.transport.sutherland_k_K,
             "transport_bulk_law": "constant_bulk_to_shear_ratio",
-            "tau_metadata_scope": "reference_state" if self.transport.mode == "local" else "constant",
+            "tau_metadata_scope": "reference_state",
             "velocity_set": self.lattice.velocity_set,
             "Q": self.lattice.Q,
             "D": self.lattice.D,
@@ -256,21 +262,12 @@ def _collision_from_config(config: dict[str, Any] | None) -> CollisionScales:
     collision = (config or {}).get("collision", {})
     _assert_no_retired_collision_values(collision)
 
-    regularized_heat_flux_factor = collision.get("regularized_heat_flux_factor", 0.0)
-    regularized_heat_flux_factor_policy = str(
-        collision.get("regularized_heat_flux_factor_policy", "specified")
-    )
-    if isinstance(regularized_heat_flux_factor, str):
-        regularized_heat_flux_factor_policy = regularized_heat_flux_factor
-        regularized_heat_flux_factor = 0.0
-
-    conductive_heat_flux_moment_factor = collision.get("conductive_heat_flux_moment_factor", 1.0)
-    conductive_heat_flux_moment_factor_policy = str(
-        collision.get("conductive_heat_flux_moment_factor_policy", "specified")
-    )
-    if isinstance(conductive_heat_flux_moment_factor, str):
-        conductive_heat_flux_moment_factor_policy = conductive_heat_flux_moment_factor
-        conductive_heat_flux_moment_factor = 1.0
+    for key in _RETIRED_HEAT_FLUX_KEYS:
+        if key in collision:
+            raise ValueError(
+                f"collision.{key} is retired; heat-flux coefficients are derived from local tau32. "
+                "Use the current local-transport baseline; reproduce historical runs at their original commit."
+            )
 
     return CollisionScales(
         bulk_viscosity_policy=str(
@@ -278,15 +275,8 @@ def _collision_from_config(config: dict[str, Any] | None) -> CollisionScales:
         ),
         nu_b_lu=collision.get("nu_b_lu", "auto"),
         trace_bulk_scale=float(collision.get("trace_bulk_scale", 1.0)),
-        regularized_heat_flux_factor_policy=regularized_heat_flux_factor_policy,
-        regularized_heat_flux_factor=float(regularized_heat_flux_factor),
         regularized_heat_flux_f_fraction=float(
             collision.get("regularized_heat_flux_f_fraction", 0.5714285714285714)
-        ),
-        conductive_heat_flux_moment_factor_policy=conductive_heat_flux_moment_factor_policy,
-        conductive_heat_flux_moment_factor=float(conductive_heat_flux_moment_factor),
-        conductive_heat_flux_galilean_correction_factor=float(
-            collision.get("conductive_heat_flux_galilean_correction_factor", 0.0)
         ),
     )
 
@@ -353,12 +343,10 @@ def local_transport_coefficients(
 
 def _validate_local_transport_mapping(mapping: UnitMapping) -> None:
     t, p = mapping.transport, mapping.physical
-    if t.mode not in {"frozen", "local"}:
-        raise ValueError(f"unknown transport mode: {t.mode}")
+    if t.mode != "local":
+        raise ValueError("transport.mode must be local; frozen transport is retired")
     if t.model not in {"constant", "sutherland"}:
         raise ValueError(f"unknown transport model: {t.model}")
-    if t.mode == "frozen":
-        return
     if any(not np.isfinite(v) or v < 0 for v in (t.sutherland_mu_K, t.sutherland_k_K)):
         raise ValueError("transport Sutherland constants must be finite and nonnegative")
     if not np.isclose(mapping.theta_transport_lu, mapping.theta_ref_lu, rtol=1e-12, atol=0):
@@ -375,38 +363,34 @@ def _validate_local_transport_mapping(mapping: UnitMapping) -> None:
 
 
 def _resolve_collision_closure(
-    collision: CollisionScales, tau32: float, *, local: bool = False,
+    collision: CollisionScales, tau32: float,
 ) -> CollisionScales:
-    if local:
-        # 这里只登记参考态；运行中全部热流系数从同一局部 tau32 产生。
-        return replace(
-            collision,
-            regularized_heat_flux_factor_policy=LOCAL_TAU_POLICY,
-            regularized_heat_flux_factor=1.0 - 1.0 / tau32,
-            conductive_heat_flux_moment_factor_policy=LOCAL_TAU_POLICY,
-            conductive_heat_flux_moment_factor=1.0 - 0.5 / tau32,
-            conductive_heat_flux_galilean_correction_factor=0.0,
-        )
-    if collision.regularized_heat_flux_factor_policy != "specified":
-        raise ValueError(
-            "unknown regularized_heat_flux_factor_policy: "
-            f"{collision.regularized_heat_flux_factor_policy}"
-        )
-    if collision.conductive_heat_flux_moment_factor_policy != "specified":
-        raise ValueError(
-            "unknown conductive_heat_flux_moment_factor_policy: "
-            f"{collision.conductive_heat_flux_moment_factor_policy}"
-        )
-    return collision
+    # 这里只登记参考态；运行中全部热流系数从同一局部 tau32 产生。
+    return replace(
+        collision,
+        regularized_heat_flux_factor=1.0 - 1.0 / tau32,
+        conductive_heat_flux_moment_factor=1.0 - 0.5 / tau32,
+    )
 
 
 def create_unit_mapping(config: dict[str, Any] | None = None) -> UnitMapping:
-    """Create the complete Phase 2 mapping from a config dictionary."""
+    """Create the mapping from an explicit local-transport configuration.
+
+    Missing transport.mode was the legacy frozen default. Reject it instead of
+    silently reinterpreting historical configurations with different physics.
+    """
+
+    transport_config = dict((config or {}).get("transport", {}) or {})
+    if transport_config.get("mode") != "local":
+        raise ValueError(
+            "transport.mode must explicitly be local; frozen transport and its implicit default are retired. "
+            "Use configs/gas_air_10k_d2q37_qmatched_local_transport.yaml."
+        )
 
     physical = _physical_from_config(config)
     lattice = _lattice_from_config(config)
     collision = _collision_from_config(config)
-    transport = TransportScales(**dict((config or {}).get("transport", {}) or {}))
+    transport = TransportScales(**transport_config)
 
     c0_lu = physical.c0_m_s * lattice.dt_s / lattice.dx_m
     if lattice.theta_ref_policy == "quadrature_matched":
@@ -440,7 +424,7 @@ def create_unit_mapping(config: dict[str, Any] | None = None) -> UnitMapping:
 
     tau21 = 0.5 + nu_lu / theta_transport_lu
     tau32 = tau32_from_alpha_lu(alpha_lu, theta_transport_lu)
-    collision = _resolve_collision_closure(collision, tau32, local=transport.mode == "local")
+    collision = _resolve_collision_closure(collision, tau32)
     if nu_b_lu == 0.0:
         tau22 = 0.5
     else:
@@ -454,7 +438,7 @@ def create_unit_mapping(config: dict[str, Any] | None = None) -> UnitMapping:
     heat_flux_scale = rho_scale * velocity_scale**3
     heat_flux_scale_definition = (
         "q_phys = q_lu * rho_scale * (dx_m/dt_s)^3; exported q_lu is conductive heat flux "
-        "after conductive_heat_flux_moment_factor"
+        "after the local pre-collision readout factor 1 - 1/(2*tau32)"
     )
 
     mapping = UnitMapping(

@@ -5,8 +5,6 @@ __pycache__/
 .ruff_cache/
 results/
 # Track authored study configs; generated runs and shared snapshots stay local.
-Compute/*/*/
-Compute/_sources/
 .idea/
 .DS_Store
 .vscode/

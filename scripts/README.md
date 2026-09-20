@@ -34,7 +34,8 @@ python -m scripts.verify_planar_open --mode thermal --frequency 50000 --refine 4
 两种命令共用 `simulation.run_case`，每算例仅有 effective.yaml、manifest.json、
 trajectory.npz、summary.json。旧入口省略 `--case` 时直接写入批次 `raw/`；
 指定后写入 `raw/<case>/`。已存在目录拒绝覆盖。
-未提交源码在项目 `Compute/_sources/` 按版本共用快照，不在每个算例下复制源码。
+版本信息只记录 Git 提交号、未提交状态与公共源码哈希，不创建源码快照目录或 ZIP。
+正式计算前应将公共代码和算例脚本提交到 Git；试算允许未提交改动，记录中会如实标记。
 
 公共函数从 `simulation`、`postproc.diagnostics`、`reference.lim2013` 导入，
 不再从另一个运行脚本导入。Python 调用例子和适用范围见根 README。
@@ -61,6 +62,8 @@ python -m scripts.verify_lim_nearfield --output Compute/lim_nearfield/new_batch 
 ```
 
 这些入口保留原有输出格式，正式数据同样放入批次 `raw/`；本轮未统一其内部数据结构。
+`verify_nearfilm_chain` 和 `verify_lim_nearfield` 同样取消源码打包，将 Git 与哈希信息
+记入各自已有的运行记录。已有历史快照保留，不影响只读分析。
 `verify_nearfilm_chain` 完整三周期约四万步，属于长计算。
 
 `verify_lim2013` 的声压由壁面热流经 `p_hat=(gamma-1)*q_hat/c0` 换算，

@@ -41,15 +41,15 @@ def extract_wall_heat_flux(
 
     The lattice is taken from ``config`` (``lattice.velocity_set``) so D2Q37
     populations are handled correctly; an explicit ``velocity_set`` overrides it,
-    and with neither it falls back to ``D2Q21`` for backward compatibility.
-    Passing ``config`` also applies the conductive-flux moment/correction factors
-    so the result matches ``GasSolver2D.get_heat_flux_lu`` (the Phase_3 handoff
-    convention).
+    and with neither it uses the project default D2Q37. Passing ``config`` applies
+    the local conductive readout, matching ``GasSolver2D.get_heat_flux_lu``.
+    Without ``config`` the result is only the raw central moment in LU;
+    physical conversion requires a configuration.
     """
 
     mapping = create_unit_mapping(config) if config is not None else None
     if velocity_set is None:
-        velocity_set = mapping.lattice.velocity_set if mapping is not None else "D2Q21"
+        velocity_set = mapping.lattice.velocity_set if mapping is not None else None
     lattice = make_lattice(velocity_set)
     q = heat_flux_lu(f, g, lattice=lattice, mapping=mapping)
     q_n = normal_heat_flux_lu(q, wall_normal)

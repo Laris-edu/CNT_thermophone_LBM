@@ -78,6 +78,11 @@ def test_pulse_case_has_four_files_and_separate_execution_and_validation_status(
     assert result['reflection_ratio'] == pytest.approx(.00490664292097417, rel=1e-10)
     manifest = json.loads((output/'manifest.json').read_text(encoding='utf-8'))
     assert manifest['status'] == 'completed'
+    assert manifest['git_commit']
+    assert isinstance(manifest['git_dirty'], bool)
+    assert manifest['source_sha256']
+    assert not (tmp_path/'sources').exists()
+    assert not list(tmp_path.rglob('*.zip'))
     assert manifest['finished_utc'] and manifest['elapsed_s'] > 0
     assert result['validation_passed'] is True
     with np.load(output/'trajectory.npz') as data:
@@ -109,7 +114,7 @@ def test_failure_keeps_partial_trajectory_and_marks_existing_records(tmp_path, m
         assert not bool(data['run_completed'])
 
 
-def test_source_snapshot_is_shared_by_content_without_extracting_code(tmp_path):
+def test_source_metadata_without_git_is_read_only_and_tracks_content(tmp_path):
     from simulation.provenance import capture_source
     root = tmp_path/'project'
     (root/'core').mkdir(parents=True)
@@ -117,16 +122,20 @@ def test_source_snapshot_is_shared_by_content_without_extracting_code(tmp_path):
     cache = tmp_path/'sources'
     first = capture_source(root, cache)
     second = capture_source(root, cache)
+    assert not cache.exists()
+    assert first['git_commit'] is None and first['git_dirty'] is None
+    assert first['source_clean'] is False
     assert first['source_id'] == second['source_id']
-    assert first['snapshot'] == second['snapshot']
-    assert len(list(cache.iterdir())) == 1
+    assert first['source_sha256'] == second['source_sha256']
     (root/'core/example.py').write_text('value = 2\n', encoding='utf-8')
     third = capture_source(root, cache)
     assert third['source_id'] != first['source_id']
-    assert len(list(cache.iterdir())) == 2
+    assert not cache.exists()
+    assert list(root.rglob('*')) == [root/'core', root/'core/example.py']
 
 
-def test_clean_git_source_needs_no_snapshot_but_deletion_does(tmp_path):
+@pytest.mark.parametrize('change', ['modified', 'staged', 'deleted', 'untracked', 'case_script'])
+def test_git_records_clean_and_dirty_states_without_archiving(tmp_path, change):
     from simulation.provenance import capture_source
     root=tmp_path/'repo'; root.mkdir()
     def git(*args):
@@ -139,12 +148,25 @@ def test_clean_git_source_needs_no_snapshot_but_deletion_does(tmp_path):
     git('-c','user.name=Compute test','-c','user.email=test@example.invalid','commit','-m','fixture')
     cache=tmp_path/'sources'
     clean=capture_source(root,cache)
-    assert clean['source_clean'] and clean['snapshot'] is None
+    assert clean['source_clean'] and clean['git_dirty'] is False
+    assert clean['git_commit'] == git('rev-parse','HEAD')
     assert not cache.exists()
-    source.unlink()
-    deleted=capture_source(root,cache)
-    assert not deleted['source_clean']
-    assert deleted['snapshot'] is not None
+    if change == 'deleted':
+        source.unlink()
+    elif change == 'untracked':
+        (root/'core/new.py').write_text('value = 3\n',encoding='utf-8')
+    elif change == 'case_script':
+        (root/'Compute/topic').mkdir(parents=True)
+        (root/'Compute/topic/run.py').write_text('value = 3\n',encoding='utf-8')
+    else:
+        source.write_text('value = 3\n',encoding='utf-8')
+        if change == 'staged':
+            git('add','core/example.py')
+    dirty=capture_source(root,cache)
+    assert dirty['git_commit'] == clean['git_commit']
+    assert dirty['git_dirty'] is True
+    assert dirty['source_clean'] is (change == 'case_script')
+    assert not cache.exists()
 
 
 def test_thermal_custom_probes_and_read_only_reanalysis(tmp_path):
@@ -153,6 +175,11 @@ def test_thermal_custom_probes_and_read_only_reanalysis(tmp_path):
     config=prepare_case(dict(name='thermal',refine=1,length_m=.00015,frequency_Hz=200000.,
         probes_m=[.00003,.00008],cycles=2.,ramp_cycles=0.,sampling={'profile_samples_per_cycle':32}))
     result=run_case(config,output,source_cache=tmp_path/'sources')
+    # 历史 manifest 中的快照路径仅为记录；重分析不要求归档存在，也不重建归档。
+    manifest_path=output/'manifest.json'
+    manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+    manifest['source_snapshot']='../missing_historical_source.zip'
+    manifest_path.write_text(json.dumps(manifest),encoding='utf-8')
     import hashlib
     hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
     replay=analyze_case(output)
@@ -170,13 +197,17 @@ def test_failed_numerical_gate_is_still_a_completed_run(tmp_path):
     assert json.loads((tmp_path/'case/manifest.json').read_text())['status']=='completed'
 
 
-def test_source_reference_supports_different_windows_drives():
-    import os
-    from simulation.runner import source_reference
-    if os.name != 'nt':
-        pytest.skip('Windows drive semantics')
-    assert source_reference(Path('E:/sources/source.zip'),Path('C:/case'))=='E:/sources/source.zip'
-    assert source_reference(Path('E:/sources/source.zip'),Path('E:/case'))=='../sources/source.zip'
+def test_existing_source_archive_is_preserved(tmp_path):
+    from simulation.provenance import capture_source
+    root=tmp_path/'project'
+    (root/'core').mkdir(parents=True)
+    (root/'core/example.py').write_text('value = 1\n',encoding='utf-8')
+    cache=root/'Compute/_sources'; cache.mkdir(parents=True)
+    archived=cache/'historical.zip'
+    archived.write_bytes(b'historical source archive')
+    capture_source(root,cache)
+    assert list(cache.iterdir()) == [archived]
+    assert archived.read_bytes() == b'historical source archive'
 
 
 def test_validation_plot_selects_cases_by_parameters_and_requires_full_group():
@@ -197,14 +228,12 @@ def test_validation_plot_selects_cases_by_parameters_and_requires_full_group():
 
 def test_selected_sweep_case_matches_legacy_command(tmp_path, monkeypatch):
     from simulation import run_study
-    from simulation.provenance import capture_source
     from scripts.verify_planar_open import main
     path=write_study(tmp_path,defaults={'mode':'pulse','refine':1},
         sweeps=[{'name':'pulse','parameters':{'refine':[1,2]}}])
     run_study(path,'batch',selected=['pulse__refine_1'],source_cache=tmp_path/'sources')
     raw=tmp_path/'batch/raw'
     assert [p.name for p in raw.iterdir()]==['pulse__refine_1']
-    monkeypatch.setattr('simulation.runner.capture_source',lambda root,cache: capture_source(root,tmp_path/'sources'))
     monkeypatch.setattr('sys.argv',['verify_planar_open','--mode','pulse','--refine','1',
         '--output',str(tmp_path/'legacy'),'--case','pulse'])
     main()
@@ -215,6 +244,34 @@ def test_selected_sweep_case_matches_legacy_command(tmp_path, monkeypatch):
         for key in new.files:
             if key!='elapsed_s':
                 np.testing.assert_array_equal(new[key],old[key])
-    assert len(list((tmp_path/'sources').glob('*.zip')))==1
+    assert not (tmp_path/'sources').exists()
+    assert not list(tmp_path.rglob('*.zip'))
     assert not list(tmp_path.rglob('*.md'))
     assert not list(tmp_path.rglob('_work'))
+
+
+@pytest.mark.parametrize('entry', ['verify_nearfilm_chain', 'verify_lim_nearfield'])
+def test_legacy_diagnostics_record_git_without_source_archives(tmp_path, monkeypatch, entry):
+    from importlib import import_module
+    module=import_module('scripts.'+entry)
+    def stop_calculation(*args, **kwargs):
+        raise RuntimeError('stop before numerical work')
+    if entry == 'verify_nearfilm_chain':
+        monkeypatch.setattr(module,'run_levelc_predictor_corrector',stop_calculation)
+        extra=['--mode','C']
+        failure=SystemExit
+        record='manifest.json'
+    else:
+        monkeypatch.setattr(module,'run_case',stop_calculation)
+        extra=[]
+        failure=RuntimeError
+        record='summary.json'
+    output=tmp_path/'batch'
+    monkeypatch.setattr('sys.argv',[entry,'--output',str(output),*extra])
+    with pytest.raises(failure):
+        module.main()
+    assert not list(output.rglob('*.zip'))
+    metadata=json.loads((output/'raw'/record).read_text(encoding='utf-8'))
+    assert metadata['git_commit']
+    assert isinstance(metadata['git_dirty'],bool)
+    assert metadata['source_sha256']

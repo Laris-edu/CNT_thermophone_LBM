@@ -14,7 +14,6 @@ import math
 from pathlib import Path
 import platform
 import time
-from zipfile import ZipFile, ZIP_DEFLATED
 
 import numpy as np
 import yaml
@@ -31,6 +30,7 @@ from reference.lim2013 import (
     near_field_pressure_rms_approximate, rayleigh_distance_m,
 )
 from simulation.output import OutputLayout, dump
+from simulation.provenance import capture_source
 from postproc.diagnostics import record, compare, fit_window
 from reference.lim2013 import matched_gas
 
@@ -169,16 +169,9 @@ def main():
     if len(set(args.frequencies))!=len(args.frequencies) or len(set(args.refinements))!=len(args.refinements):
         parser.error('扫描点不能重复')
     output = OutputLayout(args.output).create_case()
-    sources = [ROOT/'config_io.py', ROOT/'scripts/output_layout.py', Path(__file__).resolve()]
-    for directory in ('core', 'boundary', 'coupling', 'phase3_interfaces', 'postproc', 'reference', 'simulation'):
-        sources += sorted((ROOT/directory).glob('*.py'))
-    hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     (output/'baseline.yaml').write_bytes(args.config.read_bytes())
-    with ZipFile(output/'source_snapshot.zip', 'w', ZIP_DEFLATED) as archive:
-        for p in sources:
-            archive.write(p, str(p.relative_to(ROOT)))
     manifest = dict(created_utc=datetime.now(timezone.utc).isoformat(), python=platform.python_version(),
-        args={k: str(v) if isinstance(v,Path) else v for k,v in vars(args).items()}, source_sha256=hashes,
+        args={k: str(v) if isinstance(v,Path) else v for k,v in vars(args).items()}, **capture_source(ROOT),
         config_sha256=hashlib.sha256(args.config.read_bytes()).hexdigest(),
         scope='AC-only；封闭周期域 LBM 热流与 Lim 式22对照；声压由紧致热层公式换算，非直接压力验证',
         convention='Re[hat*exp(+i*omega*t)]；drive_hat=-P/s；q单侧区间均值；rms=abs(hat)/sqrt(2)',

@@ -1,0 +1,273 @@
+{
+  "frequency_Hz": 75000.0,
+  "refine": 2,
+  "cycles": 3,
+  "n_steps": 10752,
+  "elapsed_s": 35.82179560000077,
+  "gas": {
+    "rho0_kg_m3": 1.177,
+    "cp_J_kgK": 1003.4083333333333,
+    "kappa_W_mK": 0.0263,
+    "c0_m_s": 347.0,
+    "alpha_m2_s": 2.2269044448356504e-05,
+    "gamma": 1.4,
+    "p0_Pa": 101229.56642857143,
+    "T0_K": 300.0
+  },
+  "configured_p0_Pa": 101325.0,
+  "dx_m": 1.305875e-06,
+  "dt_s": 3.7202380952380955e-09,
+  "ny": 128,
+  "height_m": 0.000167152,
+  "delta_T_m": 9.72176733163138e-06,
+  "delta_T_over_dx": 7.444638523313012,
+  "half_domain_over_delta_T": 8.596790804494121,
+  "distance_m": 0.115,
+  "rayleigh_distance_m": 0.1945244956772334,
+  "acoustic_attenuation_exponent": 0.0027222202595927137,
+  "lbm": {
+    "T": {
+      "re": -0.06440238501248108,
+      "im": 0.08686514215593368,
+      "amplitude": 0.10813519370245014,
+      "phase_deg": 126.55347973674482
+    },
+    "q": {
+      "re": -450.7381809690132,
+      "im": 13.768393443551851,
+      "amplitude": 450.94841882555846,
+      "phase_deg": 178.25036873670354
+    },
+    "p_box": {
+      "re": 0.14001812537144814,
+      "im": 4.577712120331738,
+      "amplitude": 4.579852981490196,
+      "phase_deg": 88.2480446552408
+    },
+    "p_probe": {
+      "re": 0.4238220402260398,
+      "im": 4.482206605073981,
+      "amplitude": 4.5021995926824685,
+      "phase_deg": 84.59836851123646
+    },
+    "E_gas": {
+      "re": 5.851077498552083e-05,
+      "im": 0.0019129343419094736,
+      "amplitude": 0.0019138289649929632,
+      "phase_deg": 88.24804463361436
+    }
+  },
+  "reference": {
+    "T_hat": {
+      "re": -0.08045890324571044,
+      "im": 0.08654078681160228,
+      "amplitude": 0.11816489704423132,
+      "phase_deg": 132.91429358855157
+    },
+    "q_hat": {
+      "re": -450.5441872640501,
+      "im": 17.573029862460572,
+      "amplitude": 450.88676633493066,
+      "phase_deg": 177.7663670841769
+    },
+    "p_exact_at_x": {
+      "re": -0.3356471306127433,
+      "im": -0.39499195270206783,
+      "amplitude": 0.5183412379774163,
+      "phase_deg": -130.356448771379
+    }
+  },
+  "p_from_q_rms_Pa": 0.3675719710857679,
+  "p_Eq22_matched_rms_Pa": 0.3675310291788041,
+  "p_Eq22_table1_rms_Pa": 0.3673791824821717,
+  "p_from_q_at_x": {
+    "re": -0.3332776617586668,
+    "im": -0.3989289511033624,
+    "amplitude": 0.5198252666577041,
+    "phase_deg": -129.8764324160331
+  },
+  "p_Eq22_error_percent": 0.01113971439508088,
+  "p_Eq22_table1_error_percent": 0.05247673596897595,
+  "p_exact_comparison": {
+    "amplitude_error_percent": 0.2863034178176793,
+    "phase_error_deg": 0.4800163553458986,
+    "complex_relative_error": 0.008864882508959449
+  },
+  "q_comparison": {
+    "amplitude_error_percent": 0.013673608371544965,
+    "phase_error_deg": 0.4840016525266765,
+    "complex_relative_error": 0.00844908132705026
+  },
+  "T_comparison": {
+    "amplitude_error_percent": -8.487887344434341,
+    "phase_error_deg": -6.360813851806744,
+    "complex_relative_error": 0.13591002427879675
+  },
+  "box_over_converted_pressure": 8.810370090197923,
+  "window_complex_relative_change": {
+    "T": 0.0008484085144397038,
+    "q": 7.917940760667933e-05,
+    "p_box": 3.854052517245448e-05,
+    "p_probe": 0.004239984176754119,
+    "E_gas": 3.8541110180253324e-05
+  },
+  "windows": [
+    {
+      "hats": {
+        "T": {
+          "re": -0.06432188261630623,
+          "im": 0.08690912114032079,
+          "amplitude": 0.10812261521388035,
+          "phase_deg": 126.50533147233502
+        },
+        "q": {
+          "re": -450.70328646645294,
+          "im": 13.760838221373113,
+          "amplitude": 450.9133099612567,
+          "phase_deg": 178.2511929250702
+        },
+        "p_box": {
+          "re": 0.13986793269816045,
+          "im": 4.577619402500758,
+          "amplitude": 4.579755717584581,
+          "phase_deg": 88.24988732371767
+        },
+        "p_probe": {
+          "re": 0.42476795783597454,
+          "im": 4.501353709738202,
+          "amplitude": 4.521350797956074,
+          "phase_deg": 84.60927588230113
+        },
+        "E_gas": {
+          "re": 5.844801142357915e-05,
+          "im": 0.0019128955965479232,
+          "amplitude": 0.0019137883198859288,
+          "phase_deg": 88.2498873330423
+        }
+      },
+      "quality": {
+        "T": {
+          "n_samples": 3584,
+          "residual_rms": 0.00010077159150613334,
+          "residual_over_fundamental": 0.0009320121540419111,
+          "h2_over_h1": 0.000280622123404925,
+          "condition_number": 5.264460461157004
+        },
+        "q": {
+          "n_samples": 3584,
+          "residual_rms": 0.6772491048608182,
+          "residual_over_fundamental": 0.0015019496872226033,
+          "h2_over_h1": 4.851821099074905e-05,
+          "condition_number": 5.264460461157005
+        },
+        "p_box": {
+          "n_samples": 3584,
+          "residual_rms": 0.00024076446933522016,
+          "residual_over_fundamental": 5.257146541916482e-05,
+          "h2_over_h1": 1.234611159885328e-05,
+          "condition_number": 5.264460461157004
+        },
+        "p_probe": {
+          "n_samples": 3584,
+          "residual_rms": 0.13916808401599481,
+          "residual_over_fundamental": 0.03078020048320676,
+          "h2_over_h1": 0.0014249690330180103,
+          "condition_number": 5.264460461157004
+        },
+        "E_gas": {
+          "n_samples": 3584,
+          "residual_rms": 1.0061061415505783e-07,
+          "residual_over_fundamental": 5.25714433041658e-05,
+          "h2_over_h1": 1.2335743315200601e-05,
+          "condition_number": 5.264460461157004
+        }
+      }
+    },
+    {
+      "hats": {
+        "T": {
+          "re": -0.06440238501248108,
+          "im": 0.08686514215593368,
+          "amplitude": 0.10813519370245014,
+          "phase_deg": 126.55347973674482
+        },
+        "q": {
+          "re": -450.7381809690132,
+          "im": 13.768393443551851,
+          "amplitude": 450.94841882555846,
+          "phase_deg": 178.25036873670354
+        },
+        "p_box": {
+          "re": 0.14001812537144814,
+          "im": 4.577712120331738,
+          "amplitude": 4.579852981490196,
+          "phase_deg": 88.2480446552408
+        },
+        "p_probe": {
+          "re": 0.4238220402260398,
+          "im": 4.482206605073981,
+          "amplitude": 4.5021995926824685,
+          "phase_deg": 84.59836851123646
+        },
+        "E_gas": {
+          "re": 5.851077498552083e-05,
+          "im": 0.0019129343419094736,
+          "amplitude": 0.0019138289649929632,
+          "phase_deg": 88.24804463361436
+        }
+      },
+      "quality": {
+        "T": {
+          "n_samples": 3584,
+          "residual_rms": 7.55808941863354e-05,
+          "residual_over_fundamental": 0.0006989481555311893,
+          "h2_over_h1": 6.914855041731155e-05,
+          "condition_number": 5.264460461157001
+        },
+        "q": {
+          "n_samples": 3584,
+          "residual_rms": 0.4939360801698533,
+          "residual_over_fundamental": 0.001095327224910226,
+          "h2_over_h1": 4.2756747023977374e-05,
+          "condition_number": 5.264460461157003
+        },
+        "p_box": {
+          "n_samples": 3584,
+          "residual_rms": 0.00018084704214789497,
+          "residual_over_fundamental": 3.948752129791093e-05,
+          "h2_over_h1": 3.249931350078606e-06,
+          "condition_number": 5.264460461157001
+        },
+        "p_probe": {
+          "n_samples": 3584,
+          "residual_rms": 0.10471328877729304,
+          "residual_over_fundamental": 0.023258251132954218,
+          "h2_over_h1": 0.0008687113887269669,
+          "condition_number": 5.264460461157001
+        },
+        "E_gas": {
+          "n_samples": 3584,
+          "residual_rms": 7.557239839545714e-08,
+          "residual_over_fundamental": 3.9487540306787555e-05,
+          "h2_over_h1": 3.2450118094697423e-06,
+          "condition_number": 5.264460461157001
+        }
+      }
+    }
+  ],
+  "film_harmonic_balance_relative": 4.4705524477437805e-05,
+  "gas_harmonic_balance_relative": 4.988255509609118e-05,
+  "film_energy_relative": 2.458888564187665e-13,
+  "total_energy_relative": 9.332305675203923e-12,
+  "mass_relative_drift": 2.4091839634365897e-14,
+  "max_wall_film_difference_K": 3.410605131648481e-13,
+  "gates": {
+    "finite": true,
+    "energy": true,
+    "mass": true,
+    "stationary_T_q": true,
+    "pressure_from_q_Eq22": true,
+    "film_temperature": false,
+    "nearfield_distance": true
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "kind": "prescribed_temperature_direct_pressure",
+  "frequency_Hz": 50000.0,
+  "wall_amplitude_K": 0.1,
+  "cycles": 6,
+  "ramp_cycles": 2,
+  "probes": [
+    {
+      "z_m": 0.000118834625,
+      "lbm": {
+        "re": 0.27945349477920867,
+        "im": -0.29547889461519306,
+        "amplitude": 0.40669648745388687,
+        "phase_deg": -46.59662268618029
+      },
+      "lim": {
+        "re": 0.22474174339065292,
+        "im": -0.2803524757228471,
+        "amplitude": 0.3593137373747345,
+        "phase_deg": -51.282943682518535
+      },
+      "comparison": {
+        "amplitude_error_percent": 13.187013228424416,
+        "phase_error_deg": 4.68632099633825,
+        "complex_relative_error": 0.15797972964202942
+      },
+      "fit": {
+        "n_samples": 2688,
+        "residual_rms": 2.6717118070018296e-08,
+        "residual_over_fundamental": 6.569301406382961e-08,
+        "h2_over_h1": 5.152932184384147e-05,
+        "condition_number": 5.264168741960732
+      },
+      "cycle_change": 2.2099951691745436e-06
+    },
+    {
+      "z_m": 0.000299045375,
+      "lbm": {
+        "re": 0.22774444818449655,
+        "im": -0.33701292898669766,
+        "amplitude": 0.4067496133778786,
+        "phase_deg": -55.95020984801471
+      },
+      "lim": {
+        "re": 0.17621835394371493,
+        "im": -0.3131339618249664,
+        "amplitude": 0.3593129364701916,
+        "phase_deg": -60.63105844465955
+      },
+      "comparison": {
+        "amplitude_error_percent": 13.202050940245602,
+        "phase_error_deg": 4.680848596644839,
+        "complex_relative_error": 0.15805260756940212
+      },
+      "fit": {
+        "n_samples": 2688,
+        "residual_rms": 3.3835792800221995e-08,
+        "residual_over_fundamental": 8.318580199555804e-08,
+        "h2_over_h1": 5.189856304794826e-05,
+        "condition_number": 5.264168741960732
+      },
+      "cycle_change": 2.247132766799028e-06
+    },
+    {
+      "z_m": 0.000599396625,
+      "lbm": {
+        "re": 0.12881067257122877,
+        "im": -0.38585346871008985,
+        "amplitude": 0.40678629362831364,
+        "phase_deg": -71.53928224114546
+      },
+      "lim": {
+        "re": 0.08563944002916898,
+        "im": -0.34895681209577106,
+        "amplitude": 0.35931180108166905,
+        "phase_deg": -76.2112385672921
+      },
+      "comparison": {
+        "amplitude_error_percent": 13.21261712076469,
+        "phase_error_deg": 4.671956326146629,
+        "complex_relative_error": 0.15805249755533773
+      },
+      "fit": {
+        "n_samples": 2688,
+        "residual_rms": 3.51947653936813e-08,
+        "residual_over_fundamental": 8.651905421828016e-08,
+        "h2_over_h1": 5.2611728637870324e-05,
+        "condition_number": 5.264168741960732
+      },
+      "cycle_change": 2.375427450109985e-06
+    }
+  ],
+  "heat_flux": {
+    "lbm": {
+      "re": 269.5955735740451,
+      "im": -228.2202214231156,
+      "amplitude": 353.22265323324643,
+      "phase_deg": -40.24885129642454
+    },
+    "lim": {
+      "re": 219.94163984819053,
+      "im": -220.87474395911696,
+      "amplitude": 311.704952572327,
+      "phase_deg": -45.12128144396679
+    },
+    "comparison": {
+      "amplitude_error_percent": 13.31955117116268,
+      "phase_error_deg": 4.8724301475422385,
+      "complex_relative_error": 0.1610314938601952
+    },
+    "fit": {
+      "n_samples": 2688,
+      "residual_rms": 2.8296136675812162e-05,
+      "residual_over_fundamental": 8.0108499318494e-08,
+      "h2_over_h1": 5.121914562548728e-05,
+      "condition_number": 5.264168741960731
+    },
+    "cycle_change": 2.1219943881505573e-06
+  },
+  "max_wall_mass_transfer_lu": 4.440892098500626e-16,
+  "max_mass_residual_lu": 1.2467804566540508e-13,
+  "max_energy_residual_J_m2": 1.042032686804156e-13,
+  "cumulative_mass_residual_lu": 7.902678511584327e-12,
+  "cumulative_energy_residual_J_m2": 1.0637362301765818e-12,
+  "min_f": 0.00024506826539514583,
+  "min_g": 0.0002565089390308013,
+  "elapsed_s": 102.6213437999977,
+  "gates": {
+    "pressure_amplitude": false,
+    "pressure_phase": true,
+    "cycle_stationarity": true,
+    "impermeable_wall": true,
+    "mass_audit": true,
+    "energy_audit": true,
+    "cumulative_mass_audit": true,
+    "cumulative_energy_audit": true,
+    "positive_populations": true
+  },
+  "mapping": {
+    "transport_mode": "local",
+    "transport_model": "sutherland",
+    "transport_sutherland_mu_K": 111.0,
+    "transport_sutherland_k_K": 194.0,
+    "transport_bulk_law": "constant_bulk_to_shear_ratio",
+    "tau_metadata_scope": "reference_state",
+    "velocity_set": "D2Q37",
+    "Q": 37,
+    "D": 2,
+    "S": 3,
+    "array_layout": "c=(Q,D) columns=(cx,cy); w=(Q,); f,g=(...,Q); u,q=(...,D)",
+    "theta_q_lu": 0.6979533220196852,
+    "theta_ref_lu": 0.6980220947322513,
+    "theta_transport_lu": 0.6980220947322513,
+    "dx_m": 2.61175e-06,
+    "dt_s": 7.440476190476191e-09,
+    "T0_K": 300.0,
+    "p0_Pa": 101325.0,
+    "rho0_kg_m3": 1.177,
+    "c0_m_s": 347.0,
+    "gamma_target": 1.4,
+    "cp_J_kgK": 1003.4083333333333,
+    "kg_W_mK": 0.0263,
+    "nu0_m2_s": 1.57e-05,
+    "alpha0_m2_s": 2.2269044448356504e-05,
+    "Pr_target": 0.7050145342522178,
+    "bulk_viscosity_policy": "diagnostic_zero",
+    "trace_bulk_policy": "tau22",
+    "trace_bulk_scale": 1.0,
+    "nu_lu": 0.017125260124356816,
+    "alpha_lu": 0.02429064833751396,
+    "nu_b_lu": 0.0,
+    "Pr_lu": 0.7050145342522179,
+    "tau21": 0.5245339800181049,
+    "tau22": 0.5,
+    "tau32": 0.5347992542368325,
+    "heat_flux_tau32_relation": "alpha_lu = theta_transport_lu * (tau32 - 0.5); regularized_heat_flux_factor is a lattice-family projection closure h(tau32), not an independent transport knob",
+    "regularized_heat_flux_factor_policy": "local_tau",
+    "regularized_heat_flux_factor": -0.8698604982668063,
+    "regularized_heat_flux_f_fraction": 0.5714285714285714,
+    "conductive_heat_flux_moment_factor_policy": "local_tau",
+    "conductive_heat_flux_moment_factor": 0.06506975086659683,
+    "conductive_heat_flux_galilean_correction_factor": 0.0,
+    "rho_scale": 1.177,
+    "velocity_scale": 351.01919999999996,
+    "pressure_scale": 145023.44151068924,
+    "temperature_scale": 429.7858223457448,
+    "heat_flux_scale": 50906012.42032892,
+    "heat_flux_scale_definition": "q_phys = q_lu * rho_scale * (dx_m/dt_s)^3; exported q_lu is conductive heat flux after conductive_heat_flux_moment_factor"
+  },
+  "steps": 16128,
+  "actual_length_m": 0.00100030025
+}

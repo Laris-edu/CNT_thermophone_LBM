@@ -127,22 +127,14 @@ def heat_flux_lu(
 
     The raw central energy-flux moment remains available through
     :func:`central_energy_flux_lu`.  When a :class:`UnitMapping` is supplied,
-    the configured conductive heat-flux moment factor is applied so exported
-    ``q_lu`` fields use the Fourier-law/Phase_3 handoff convention.
+    the local pre-collision factor ``1 - 1/(2*tau32)`` is applied. Without a
+    mapping this returns the raw moment, not a corrected conductive heat flux.
     """
 
     q_raw = central_energy_flux_lu(f, g, u=u, lattice=lattice)
     if mapping is None:
         return q_raw
-    if mapping.transport.mode == "local":
-        state = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
-        coefficients = local_transport_coefficients(mapping, state.rho, state.theta)
-        # 此关系读取碰撞前布居；是离散时间半步修正，不是标定增益。
-        return q_raw * coefficients.heat_flux_readout[..., None]
-    q_conductive = q_raw * mapping.collision.conductive_heat_flux_moment_factor
-    correction_factor = mapping.collision.conductive_heat_flux_galilean_correction_factor
-    if correction_factor == 0.0:
-        return q_conductive
     state = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
-    theta_prime = state.theta - mapping.theta_ref_lu
-    return q_conductive + correction_factor * state.u * theta_prime[..., None]
+    coefficients = local_transport_coefficients(mapping, state.rho, state.theta)
+    # 此关系读取碰撞前布居；是离散时间半步修正，不是标定增益。
+    return q_raw * coefficients.heat_flux_readout[..., None]

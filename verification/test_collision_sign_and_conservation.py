@@ -20,7 +20,6 @@ from core.macroscopic import recover_macro
 from core.solver import GasSolver2D
 
 ROOT = Path(__file__).resolve().parents[1]
-ANALYTIC = ROOT / 'configs/gas_air_10k_d2q37_qmatched_analytic_stress.yaml'
 LOCAL = ROOT / 'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
 
 
@@ -56,7 +55,7 @@ def test_measured_deviatoric_stress_keeps_the_navier_stokes_sign():
     这里会先于动态回归失败，并直接指出是符号约定变了。
     """
 
-    config = deepcopy(load_config(ANALYTIC))
+    config = deepcopy(load_config(LOCAL))
     config['numerics'] = {'nx': 4, 'ny': 32}
     solver = GasSolver2D(config)
     _shear_state(solver, amplitude=1.0e-6)
