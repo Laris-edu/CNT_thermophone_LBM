@@ -64,5 +64,7 @@ def pull_stream_open_y(distribution: np.ndarray, *, lattice: Lattice) -> np.ndar
     for a, (cx, cy) in enumerate(lattice.c.astype(int)):
         lo, hi = max(0, cy), min(ny, ny + cy)
         if lo < hi:
-            out[lo:hi, :, a] = np.roll(dist[lo-cy:hi-cy, :, a], cx, axis=1)
+            source = dist[lo-cy:hi-cy, :, a]
+            # A periodic shift by a whole x extent is exactly the identity.
+            out[lo:hi, :, a] = source if cx % dist.shape[1] == 0 else np.roll(source, cx, axis=1)
     return out

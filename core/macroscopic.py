@@ -45,8 +45,10 @@ def translational_internal_energy(
     lattice: Lattice | None = None,
 ) -> np.ndarray:
     lattice = lattice or make_lattice()
-    peculiar = lattice.c - np.asarray(u, dtype=float)[..., None, :]
-    c2 = np.sum(peculiar**2, axis=-1)
+    u = np.asarray(u, dtype=float)
+    cx = lattice.c[:, 0] - u[..., 0, None]
+    cy = lattice.c[:, 1] - u[..., 1, None]
+    c2 = cx*cx + cy*cy
     return 0.5 * np.sum(np.asarray(f, dtype=float) * c2, axis=-1)
 
 
@@ -109,10 +111,13 @@ def central_energy_flux_lu(
     if u is None:
         u = velocity(f, lattice=lattice)
     u = np.asarray(u, dtype=float)
-    peculiar = lattice.c - u[..., None, :]
-    c2 = np.sum(peculiar**2, axis=-1)
-    translational = 0.5 * np.einsum("...a,...a,...ai->...i", f, c2, peculiar)
-    internal = np.einsum("...a,...ai->...i", g, peculiar)
+    cx = lattice.c[:, 0] - u[..., 0, None]
+    cy = lattice.c[:, 1] - u[..., 1, None]
+    c2 = cx*cx + cy*cy
+    translational = .5 * np.stack((np.einsum('...a,...a,...a->...', f, c2, cx),
+        np.einsum('...a,...a,...a->...', f, c2, cy)), axis=-1)
+    internal = np.stack((np.einsum('...a,...a->...', g, cx),
+        np.einsum('...a,...a->...', g, cy)), axis=-1)
     return translational + internal
 
 

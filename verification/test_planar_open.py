@@ -7,15 +7,16 @@ from core.streaming import pull_stream_open_y
 from simulation.planar import make_solver, pulse_case
 
 
-def test_open_streaming_has_no_y_wrap_and_covers_every_multispeed_link():
+@pytest.mark.parametrize('nx', [1, 4])
+def test_open_streaming_has_no_y_wrap_and_covers_every_multispeed_link(nx):
     lattice = make_lattice()
-    f = np.arange(9*4*lattice.q,dtype=float).reshape(9,4,lattice.q)
+    f = np.arange(9*nx*lattice.q,dtype=float).reshape(9,nx,lattice.q)
     out = pull_stream_open_y(f,lattice=lattice)
     for y in range(9):
-        for x in range(4):
+        for x in range(nx):
             for a,(cx,cy) in enumerate(lattice.c.astype(int)):
                 if 0 <= y-cy < 9:
-                    assert out[y,x,a] == f[y-cy,(x-cx)%4,a]
+                    assert out[y,x,a] == f[y-cy,(x-cx)%nx,a]
                 else:
                     assert np.isnan(out[y,x,a])
 

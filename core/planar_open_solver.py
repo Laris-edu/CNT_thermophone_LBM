@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from boundary.planar_open import characteristic_top, crossing_totals, diffuse_temperature_wall
+from boundary.planar_open import PreparedDiffuseWall, characteristic_top, crossing_totals
 from core.collision_smrt import collide_fg
 from core.solver import GasSolver2D
 from core.streaming import pull_stream_open_y
@@ -47,8 +47,8 @@ class PlanarOpenSolver(GasSolver2D):
     def step_wall_energy(self, solve_temperature):
         """Call solve_temperature(exchange_J_m2) to obtain the midpoint wall T.
 
-        Trial exchange evaluations reconstruct only the prepared incoming wall
-        links, without advancing time. Commit once, after the callback and all
+        Trial exchange evaluations construct only incoming wall populations,
+        without writing the streamed state. Commit once, after the callback and all
         boundary checks succeed. The gas layer has no knowledge of a film ODE.
         """
         f, g = self._require_state()
@@ -57,16 +57,14 @@ class PlanarOpenSolver(GasSolver2D):
         fn = pull_stream_open_y(fp, lattice=self.lattice)
         gn = pull_stream_open_y(gp, lattice=self.lattice)
         scale = self.mapping.pressure_scale * self.mapping.lattice.dx_m
-        before_wall = crossing_totals(fp, gp, self.lattice, top=False)
+        wall = PreparedDiffuseWall(fp, gp, self.mapping, self.lattice)
 
         def exchange(temperature):
-            diffuse_temperature_wall(fp, gp, fn, gn, self.mapping, self.lattice, temperature)
-            incoming = crossing_totals(fn, gn, self.lattice, top=False, incoming=True)
-            return float((incoming[1]-before_wall[1])*scale)
+            return float(wall.energy_exchange_lu(temperature)*scale)
 
         temperature_K = solve_temperature(exchange)
         # The last trial need not be the returned root.
-        diffuse_temperature_wall(fp, gp, fn, gn, self.mapping, self.lattice, temperature_K)
+        wall.write(temperature_K, fn, gn)
         characteristic_top(fp, gp, fn, gn, self.mapping, self.lattice)
         if not np.isfinite(fn).all() or not np.isfinite(gn).all():
             raise FloatingPointError("unfilled link or nonfinite open-domain state")

@@ -180,9 +180,11 @@ def _central_translational_energy_flux_lu(
     u: np.ndarray,
     lattice: Lattice,
 ) -> np.ndarray:
-    xi = lattice.c - u[..., None, :]
-    xi2 = np.sum(xi * xi, axis=-1)
-    return 0.5 * np.einsum("...a,...a,...ai->...i", f, xi2, xi)
+    cx = lattice.c[:, 0] - u[..., 0, None]
+    cy = lattice.c[:, 1] - u[..., 1, None]
+    xi2 = cx*cx + cy*cy
+    return .5 * np.stack((np.einsum('...a,...a,...a->...', f, xi2, cx),
+        np.einsum('...a,...a,...a->...', f, xi2, cy)), axis=-1)
 
 
 def _central_internal_energy_flux_lu(
@@ -190,8 +192,10 @@ def _central_internal_energy_flux_lu(
     u: np.ndarray,
     lattice: Lattice,
 ) -> np.ndarray:
-    xi = lattice.c - u[..., None, :]
-    return np.einsum("...a,...ai->...i", g, xi)
+    cx = lattice.c[:, 0] - u[..., 0, None]
+    cy = lattice.c[:, 1] - u[..., 1, None]
+    return np.stack((np.einsum('...a,...a->...', g, cx),
+        np.einsum('...a,...a->...', g, cy)), axis=-1)
 
 
 def _nonequilibrium_central_stress(
@@ -200,8 +204,13 @@ def _nonequilibrium_central_stress(
     u: np.ndarray,
     lattice: Lattice,
 ) -> np.ndarray:
-    xi = lattice.c - u[..., None, :]
-    return np.einsum("...a,...ai,...aj->...ij", f - f_eq, xi, xi)
+    cx = lattice.c[:, 0] - u[..., 0, None]
+    cy = lattice.c[:, 1] - u[..., 1, None]
+    neq = f - f_eq
+    xx = np.einsum('...a,...a,...a->...', neq, cx, cx)
+    xy = np.einsum('...a,...a,...a->...', neq, cx, cy)
+    yy = np.einsum('...a,...a,...a->...', neq, cy, cy)
+    return np.stack((np.stack((xx, xy), axis=-1), np.stack((xy, yy), axis=-1)), axis=-2)
 
 
 def _regularized_f_collision(
