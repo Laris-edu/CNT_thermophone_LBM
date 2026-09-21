@@ -1,0 +1,25 @@
+base_config: e1_air.yaml
+defaults:
+  mode: power
+  frequency_Hz: 20000.0  # power/acoustic; electrical frequency is 10000 Hz
+  power:
+    mean_W: 1.13
+    area_m2: 0.0009
+  film:
+    C_A_J_m2K: 0.0007  # explicitly assumed; not measured in the paper
+    G_W_m2K: 57.8      # total two-sided additional leak = 2 * beta0
+    gas_flux_factor: 2.0
+    T_ref_K: 300.0
+    initial_temperature_K: 300.0
+  refine: 4
+  length_m: 0.001
+  cycles: 24
+  probes_m: [0.00012, 0.00030, 0.00060]
+  stopping:
+    first_diagnostic_cycle: 6
+    first_stable_cycle: 8
+    stop_when_stable: true
+  sampling:
+    profile_samples_per_cycle: 32
+cases:
+  - name: e1_power_f20000_r4

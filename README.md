@@ -19,11 +19,11 @@
 |---|---|---|
 | 电功率输入 | `coupling.drive` 提供面功率信号，单位 W/m² | 输入的是热功率密度；没有自动求解电流、电压、电阻或焦耳热分布 |
 | 薄膜温度 | `coupling.film_ode` 的集中参数膜温 ODE | 单一膜温与单位面积热容；不描述膜内温度分布 |
-| 膜–气换热 | `coupling.conservative` 联立膜储能与热壁实际能量交换 | 当前是封闭、对称双侧、沿膜面均匀的设置，尚未接入单侧开放域 |
-| 开放域近场 | `PlanarOpenSolver` 接受给定壁温，直接恢复气体压力 | `nx=1` 平面几何；下壁全容纳漫反射、上侧线性正入射特征出口；适用于所验证的小振幅条件 |
+| 膜–气换热 | `coupling.conservative` 为闭域；`coupling.planar_open.step_open_film` 为开放域实际交换耦合 | 开放耦合为对称双侧单温膜，只计算上半气体域 |
+| 开放域近场 | `PlanarOpenSolver` 支持给温或实际交换回调，直接恢复气体压力 | `nx=1` 平面几何；下壁全容纳漫反射、上侧线性正入射特征出口；适用于所验证的小振幅条件 |
 | 远场外推 | `farfield.kirchhoff_2d` 和 `compact_source` | 独立二维外推核与解析紧致源模型；尚未完成与当前近场计算的全链路验证 |
 
-开放域现有工作流是“**给定膜温 → 气体热声响应 → 直接声压**”，并有独立声脉冲反射测试。
+开放域支持“**给定膜温 → 气体热声响应 → 直接声压**”与功率驱动的局部膜气耦合，并有独立声脉冲反射测试。
 闭域热流换算声压、开放域直接恢复声压、二维远场外推声压，必须分别标明来源。
 不能用其中一项通过测试，推断有限尺寸 CNT 器件的全部响应已验证。
 
@@ -250,3 +250,44 @@ CLI 正常退出也不等于所有物理判据通过。
 
 普通参数扫描运行算例自身检查即可，不为每个参数新建测试文件。
 支持范围以实际实现和可复现测试为依据，历史阶段名或“certified”字样不能替代当前验证。
+
+## 7. 开放域功率驱动与冷启动
+
+`coupling.planar_open.step_open_film(solver=..., params=FilmOdeParams(...), T_s_K=..., drive=...)`
+联立中点膜温与实际单侧壁面交换，返回步末膜温、中点壁温、输入/热漏区间能量及气体审计。
+输入为 W/m²，当前要求 `gas_flux_factor=2`；`G` 是双侧合计附加热漏。膜状态由调用方在成功返回后更新。
+`PlanarOpenSolver.step_wall_energy(solve_temperature)` 将试算温度到实际壁面区间能量的函数传给回调，
+仅在回调及边界检查成功后提交一次气体状态。原 `step_temperature` 入口保持兼容。
+
+功率算例使用独立的 `mode: power` 参数结构，不能混入 `amplitude_K` 或 `ramp_cycles`：
+`power.mean_W`、`power.area_m2` 指定总平均功率和投影面积；`film` 指定面热容、合计热漏、参考及初始膜温。
+`frequency_Hz` 是功率/声学频率；此模式采用纯交流焦耳热波形，电频为其一半：
+
+$$
+P(t)=\overline P[1-\cos(2\pi f_a t)],\qquad f_e=f_a/2.
+$$
+
+$$
+C_A(T_s^{n+1}-T_s^n)=p_{\mathrm{in}}''(t_{n+1/2})\Delta t
+-2\Delta E_{\mathrm{wall}}^n-G(T_s^{n+1/2}-T_0)\Delta t.
+$$
+
+`cycles` 是上限；默认第 6 周期开始诊断、第 8 周期起允许提前结束。四个两周期窗口的基频幅值极差
+小于末窗口幅值的 1%，相位跨度小于 1°，同时通过两/四周期及线性/二次漂移拟合的幅相敏感性检查。
+`stopping.stop_when_stable: false` 可用于固定时长的短回归。温度、压力、速度在步末采样，实际热流在区间中点拟合。
+从冷启动起保存每周期 32 组气体剖面；完整原始时序支持只读重分析。
+
+E1 配置入口为 `Compute/open_planar/e1_study.yaml`：平均 1.13 W、面积 9 cm²、电频 10 kHz、声频 20 kHz，
+采用假设面热容 $7\times10^{-4}\,\mathrm{J/(m^2 K)}$、合计附加热漏 $57.8\,\mathrm{W/(m^2 K)}$。
+气体配置记录论文表值与自洽物性的差异，缺失的面热容及黏性参数来源写入有效配置和结果。
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/open_planar/e1_study.yaml --batch 20260921_e1 --dry-run
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/open_planar/e1_study.yaml --batch 20260921_e1
+.\.venv\Scripts\python.exe -m Compute.open_planar.plot_e1 --case-dir Compute/open_planar/20260921_e1/raw/e1_power_f20000_r4
+```
+
+功率算例的 `validation_passed` 仅汇总当前网格和域长下的守恒、有限性、正性与有限窗口周期稳定性。
+平均温升/漂移另报；300 K 线性参照仅作独立诊断，不作为完整冷启动的精确参照门限。
+到时长上限未稳定时，`status=completed`、`validation_passed=false`；异常则保留部分数据及失败状态。
+输出尚未验证有限膜辐射、网格/域长独立性、长期热稳态或暖背景下出口适用性。

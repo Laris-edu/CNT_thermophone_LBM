@@ -1,4 +1,4 @@
-"""给定壁温 -> 单侧空气 -> 直接压力的独立验证入口；不调用薄膜 ODE。"""
+"""单侧开放平面气体推进；支持给温或由实际壁面交换确定壁温。"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -42,15 +42,36 @@ class PlanarOpenSolver(GasSolver2D):
 
     def step_temperature(self, temperature_K):
         """指定本时间区间中点的壁温；交换量属于 [t_n,t_n+dt]。"""
+        return self.step_wall_energy(lambda exchange: temperature_K)
+
+    def step_wall_energy(self, solve_temperature):
+        """Call solve_temperature(exchange_J_m2) to obtain the midpoint wall T.
+
+        Trial exchange evaluations reconstruct only the prepared incoming wall
+        links, without advancing time. Commit once, after the callback and all
+        boundary checks succeed. The gas layer has no knowledge of a film ODE.
+        """
         f, g = self._require_state()
         mass0, energy0 = self._totals(f, g)
         fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice)
         fn = pull_stream_open_y(fp, lattice=self.lattice)
         gn = pull_stream_open_y(gp, lattice=self.lattice)
+        scale = self.mapping.pressure_scale * self.mapping.lattice.dx_m
+        before_wall = crossing_totals(fp, gp, self.lattice, top=False)
+
+        def exchange(temperature):
+            diffuse_temperature_wall(fp, gp, fn, gn, self.mapping, self.lattice, temperature)
+            incoming = crossing_totals(fn, gn, self.lattice, top=False, incoming=True)
+            return float((incoming[1]-before_wall[1])*scale)
+
+        temperature_K = solve_temperature(exchange)
+        # The last trial need not be the returned root.
         diffuse_temperature_wall(fp, gp, fn, gn, self.mapping, self.lattice, temperature_K)
         characteristic_top(fp, gp, fn, gn, self.mapping, self.lattice)
         if not np.isfinite(fn).all() or not np.isfinite(gn).all():
             raise FloatingPointError("unfilled link or nonfinite open-domain state")
+        if np.min(fn) <= 0 or np.min(gn) <= 0:
+            raise FloatingPointError("nonpositive open-domain population; state not committed")
         exchanges = []
         for top in (False, True):
             before = np.asarray(crossing_totals(fp, gp, self.lattice, top=top))
@@ -58,7 +79,6 @@ class PlanarOpenSolver(GasSolver2D):
             exchanges.append(after-before)
         wall, outlet = exchanges
         mass1, energy1 = self._totals(fn, gn)
-        scale = self.mapping.pressure_scale * self.mapping.lattice.dx_m
         self.last_audit = OpenStepAudit(float(wall[0]), float(outlet[0]),
             float(wall[1]*scale), float(outlet[1]*scale),
             float(mass1-mass0-wall[0]-outlet[0]),

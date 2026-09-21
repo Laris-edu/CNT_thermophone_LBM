@@ -24,6 +24,20 @@ DEFAULTS = dict(mode='thermal', refine=4, length_m=1e-3, frequency_Hz=50000.,
         probe_fraction=.65, duration_crossings=1.65, window_fraction=.16))
 
 
+# A power run cannot silently inherit a prescribed wall temperature.
+POWER_DEFAULTS = dict(mode='power', refine=4, length_m=1e-3, frequency_Hz=20000.,
+    cycles=24., probes_m=[.12e-3,.30e-3,.60e-3],
+    power=dict(mean_W=1.13,area_m2=9e-4),
+    film=dict(C_A_J_m2K=7e-4,G_W_m2K=57.8,T_ref_K=300.,
+              initial_temperature_K=300.,gas_flux_factor=2.),
+    stopping=dict(first_diagnostic_cycle=6,first_stable_cycle=8,stop_when_stable=True),
+    sampling=dict(profile_samples_per_cycle=32),
+    analysis=dict(harmonics=3,detrend_order=1,window_cycles=2.,
+        stationary_relative=.01,stationary_phase_deg=1.,wall_mass_lu=1e-12,
+        mass_residual_lu=1e-10,energy_residual_J_m2=1e-10,
+        cumulative_mass_lu=1e-8,cumulative_energy_J_m2=1e-8))
+
+
 def valid_name(value):
     """Portable directory component, including Windows reserved-name protection."""
     if (not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', value)
@@ -49,6 +63,8 @@ def _finite(value, name, *, minimum=0., strict=True):
 
 
 def validate_run(run):
+    if run.get('mode') == 'power':
+        return _validate_power_run(run)
     if set(run) != set(DEFAULTS):
         raise ValueError(f'unknown/missing run parameters: {set(run) ^ set(DEFAULTS)}')
     if run['mode'] not in ('thermal','pulse'):
@@ -88,6 +104,45 @@ def validate_run(run):
         raise ValueError('invalid small-amplitude pulse geometry')
 
 
+def _validate_power_run(run):
+    if set(run) != set(POWER_DEFAULTS):
+        raise ValueError(f'unknown/missing power run parameters: {set(run) ^ set(POWER_DEFAULTS)}')
+    for name in ('power','film','stopping','sampling','analysis'):
+        if not isinstance(run[name],dict) or set(run[name]) != set(POWER_DEFAULTS[name]):
+            raise ValueError(f'unknown/missing power {name} parameters')
+    for name in ('length_m','frequency_Hz','cycles'):
+        _finite(run[name],name)
+    for value,name in ((run['refine'],'refine'),
+                       (run['sampling']['profile_samples_per_cycle'],'profile_samples_per_cycle'),
+                       (run['stopping']['first_diagnostic_cycle'],'first_diagnostic_cycle'),
+                       (run['stopping']['first_stable_cycle'],'first_stable_cycle')):
+        if isinstance(value,bool) or not isinstance(value,int) or value < 1:
+            raise ValueError(f'{name} must be a positive integer')
+    for key,value in run['power'].items():
+        _finite(value,key)
+    for key,value in run['film'].items():
+        _finite(value,key,strict=key!='G_W_m2K')
+    if run['film']['gas_flux_factor'] != 2:
+        raise ValueError('power mode requires symmetric gas_flux_factor=2')
+    a=run['analysis']; stop=run['stopping']
+    if (type(a['harmonics']) is not int or a['harmonics'] != 3
+            or type(a['detrend_order']) is not int or a['detrend_order'] != 1
+            or a['window_cycles'] != 2):
+        raise ValueError('power stationarity uses three harmonics, linear trend, two-cycle windows')
+    for key,value in a.items():
+        _finite(value,key)
+    if (type(stop['stop_when_stable']) is not bool or stop['first_diagnostic_cycle'] < 2
+            or stop['first_stable_cycle'] < 8
+            or stop['first_stable_cycle'] < stop['first_diagnostic_cycle']):
+        raise ValueError('invalid power diagnostic/stationarity schedule')
+    if stop['stop_when_stable'] and run['cycles'] < stop['first_stable_cycle']:
+        raise ValueError('adaptive run must cover the first eligible stationarity check')
+    if not isinstance(run['probes_m'],list) or not run['probes_m']:
+        raise ValueError('probes_m must be a nonempty list')
+    for value in run['probes_m']:
+        _finite(value,'probe position')
+
+
 def validate_effective(config):
     run=config['run']
     validate_run(run)
@@ -97,7 +152,7 @@ def validate_effective(config):
     if nx != 1 or not isinstance(ny,int) or ny < 8 or config['numerics']['boundary'] != 'planar_open_y':
         raise ValueError('open planar cases require nx=1, ny>=8, planar_open_y')
     z=(np.arange(ny)+.5)*mapping.lattice.dx_m
-    if run['mode']=='thermal':
+    if run['mode'] in ('thermal','power'):
         probes=run['probes_m']
         if min(probes)<z[0] or max(probes)>=z[-1]:
             raise ValueError('domain must contain all requested probes')
@@ -132,7 +187,8 @@ def validate_effective(config):
 def prepare_case(parameters, base_config=BASE):
     parameters=deepcopy(parameters)
     name=valid_name(parameters.pop('name','case'))
-    run=merge(DEFAULTS,parameters)
+    defaults=POWER_DEFAULTS if parameters.get('mode')=='power' else DEFAULTS
+    run=merge(defaults,parameters)
     validate_run(run)
     config=deepcopy(base_config) if isinstance(base_config,dict) else load_config(Path(base_config))
     config['lattice']['dx_m'] /= run['refine']
@@ -142,7 +198,7 @@ def prepare_case(parameters, base_config=BASE):
     config['case'].update(name=name,purpose='single-sided open planar '+run['mode'])
     config['run']=run
     mapping=create_unit_mapping(config)
-    seconds=(run['cycles']/run['frequency_Hz'] if run['mode']=='thermal' else
+    seconds=(run['cycles']/run['frequency_Hz'] if run['mode'] in ('thermal','power') else
         run['pulse']['duration_crossings']*ny*mapping.lattice.dx_m/mapping.physical.c0_m_s)
     config['numerics']['steps']=int(np.ceil(seconds/mapping.lattice.dt_s))
     return validate_effective(config)
@@ -167,7 +223,7 @@ def load_study(path):
         if not isinstance(sweep,dict) or set(sweep)-{'name','parameters','overrides'}:
             raise ValueError('sweep accepts name, parameters and overrides')
         name=valid_name(sweep['name']); axes=sweep['parameters']
-        if (not isinstance(axes,dict) or not axes or set(axes)-set(DEFAULTS) or
+        if (not isinstance(axes,dict) or not axes or set(axes)-(set(DEFAULTS)|set(POWER_DEFAULTS)) or
             any(not isinstance(v,list) or not v for v in axes.values())):
             raise ValueError('sweep parameters must be nonempty lists of run parameters')
         for values in product(*axes.values()):

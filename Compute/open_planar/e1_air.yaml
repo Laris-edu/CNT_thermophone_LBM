@@ -1,0 +1,20 @@
+# E1 rho, c, k and T; cp/EOS are consistent with the existing D2/S3 mapping.
+include: ../../configs/gas_air_10k_d2q37_qmatched_local_transport.yaml
+physical:
+  T0_K: 300.0
+  p0_Pa: 99767.45714285715
+  rho0_kg_m3: 1.16
+  c0_m_s: 347.0
+  gamma: 1.4
+  cp_J_kgK: 1003.4083333333333
+  kg_W_mK: 0.0263
+  nu0_m2_s: 1.57e-5
+case:
+  reference: BEM E1, 30 x 30 mm suspended film, mean Joule power 1.13 W
+  frequency_interpretation: chosen electrical 10 kHz / acoustic 20 kHz; paper generator setting unresolved
+  heat_capacity_provenance: assumed 7e-4 J/(m2 K), not reported by the BEM paper
+  viscosity_provenance: inherited project air baseline, not reported by the BEM paper
+  paper_air:
+    cp_J_kgK: 1007.0
+    alpha_m2_s: 2.2e-5
+    p0_Pa: 101000.0
