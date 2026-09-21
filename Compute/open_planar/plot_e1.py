@@ -123,7 +123,10 @@ def figures(data,summary,run):
     for ax,values,cmap,label in (
         (axes[0,0],data['profile_temperature_K']-T0,'magma',r'$T-T_0$ (K)'),
         (axes[0,1],data['profile_pressure_Pa']-p0,'RdBu_r',r'$p-p_0$ (Pa)')):
-        mesh=ax.pcolormesh(tp,z,values.T,shading='auto',cmap=cmap,rasterized=True)
+        # A diverging pressure palette must be centered on zero disturbance.
+        limit=float(np.max(abs(values)))
+        scale={'vmin':-limit,'vmax':limit} if cmap=='RdBu_r' and limit>0 else {}
+        mesh=ax.pcolormesh(tp,z,values.T,shading='auto',cmap=cmap,rasterized=True,**scale)
         meshes.append(mesh)
         ax.set_xlabel('Time (ms)'); ax.set_ylabel('Distance (mm)')
         fig.colorbar(mesh,ax=ax,label=label,orientation='horizontal',pad=.12)
