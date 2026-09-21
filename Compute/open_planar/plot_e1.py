@@ -74,6 +74,7 @@ def figures(data,summary,run):
         axes[0,1].plot(time,metric(f'pressure_{j}','amplitude'),'o-',ms=3,
                       color=COLORS[j%len(COLORS)],label=f'{z*1e3:.3f} mm')
     axes[0,1].set_ylabel(r'$|\widehat{p}_1|$ (Pa)')
+    axes[0,1].ticklabel_format(axis='y',style='plain',useOffset=False)
     axes[0,1].legend(loc='upper left',bbox_to_anchor=(1.01,1.))
     for j,(channel,label) in enumerate((('film_temperature','Film'),('wall_flux','Wall flux'))):
         phases=metric(channel,'phase_relative_power_deg')
