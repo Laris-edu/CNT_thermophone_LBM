@@ -1,0 +1,40 @@
+base_config: e1_long_air.yaml
+defaults:
+  mode: power
+  frequency_Hz: 20000.0
+  power:
+    mean_W: 1.13
+    area_m2: 0.0009
+  film:
+    C_A_J_m2K: 0.0007
+    G_W_m2K: 57.8
+    gas_flux_factor: 2.0
+    T_ref_K: 300.0
+    initial_temperature_K: 300.0
+  refine: 4
+  length_m: 0.001
+  cycles: 100
+  probes_m: [0.00012, 0.00030, 0.00060]
+  stopping:
+    first_diagnostic_cycle: 6
+    first_stable_cycle: 8
+    stop_when_stable: false
+  sampling:
+    profile_samples_per_cycle: 32
+cases:
+  - name: e1_power_f20000_r4_c100_cold
+
+# A priori mean-thermal observation protocol (separate from public validation):
+# Nonoverlapping 10-cycle windows from startup. Final assessment uses windows
+# 60-70, 70-80, 80-90, 90-100; all three adjacent differences must pass.
+# Film mean and maximum spatial mean-temperature difference: <0.01 K AND
+# <1% of max(abs(latest temperature excess)); no reference-temperature scaling.
+# Mean normal-velocity profile difference: <max(1e-5 m/s, 1% latest max(abs(u))).
+# Outlet mean density/pressure changes: <1e-4 of their cold reference values.
+# Independent film and two-side gas storage rates: each <1% mean input power
+# in EACH final window. Wall, leak and outlet mean powers: adjacent changes
+# <1% mean input power. Existing conservation/finiteness/positivity gates must pass.
+# Energies are interval sums; storage rates use independent endpoint differences.
+# Temperature/velocity profiles use all 32 phase samples/cycle, piecewise-linear
+# integration over exact window bounds. State means use endpoint integration.
+# These are operational finite-window tests, not infinite-time or outlet validation.

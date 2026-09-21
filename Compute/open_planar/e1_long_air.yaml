@@ -1,0 +1,10 @@
+# Reuse E1 physical parameters; config_io includes merge at the top level only.
+include: e1_air.yaml
+numerics:
+  precision: float64
+  streaming: pull
+  boundary: periodic
+  nx: 128
+  ny: 4
+  steps: 400
+  collision_backend: numba
