@@ -10,6 +10,7 @@ import yaml
 
 from config_io import load_config
 from core.unit_mapping import create_unit_mapping
+from core.collision_smrt import validate_collision_backend
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / 'configs/gas_air_10k_d2q37_qmatched_local_transport.yaml'
@@ -147,6 +148,7 @@ def validate_effective(config):
     run=config['run']
     validate_run(run)
     valid_name(config['case']['name'])
+    validate_collision_backend(config['numerics'].get('collision_backend', 'numpy'))
     mapping=create_unit_mapping(config)
     nx,ny=config['numerics']['nx'],config['numerics']['ny']
     if nx != 1 or not isinstance(ny,int) or ny < 8 or config['numerics']['boundary'] != 'planar_open_y':

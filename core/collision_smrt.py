@@ -38,6 +38,12 @@ class CollisionDiagnostics:
     clipping_used: bool = False
 
 
+def validate_collision_backend(backend):
+    if backend not in ('numpy', 'numba'):
+        raise ValueError('collision_backend must be numpy or numba')
+    return backend
+
+
 @lru_cache(maxsize=12)
 def _fixed_zero_lower_projector(c_values, weights, kind):
     """零低阶矩时，中心矩约束等价于原始矩约束；无需逐格解 Gram 系统。
@@ -336,6 +342,7 @@ def collide_fg(
     *,
     lattice: Lattice | None = None,
     return_diagnostics: bool = False,
+    backend: str = 'numpy',
 ) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, CollisionDiagnostics]:
     """Collide ``f`` and ``g`` while conserving mass, momentum and total energy.
 
@@ -350,6 +357,7 @@ def collide_fg(
        central total energy is conserved without adding a comoving heat flux.
     """
 
+    validate_collision_backend(backend)
     lattice = lattice or make_lattice()
     f = np.asarray(f, dtype=float)
     g = np.asarray(g, dtype=float)
@@ -363,34 +371,25 @@ def collide_fg(
         lattice,
     )
 
-    f_post = _regularized_f_collision(
-        f,
-        f_eq,
-        macro_before.u,
-        mapping,
-        lattice,
-        transport=transport,
-    )
-    f_post = _correct_f_conserved_moments(f_post, f, lattice)
-
-    f_post, g_shape = _regularized_heat_flux_collision(
-        f_post,
-        g_eq,
-        f,
-        g,
-        macro_before.u,
-        mapping,
-        lattice,
-        transport=transport,
-    )
-    f_post = _correct_f_conserved_moments(f_post, f, lattice)
-
-    macro_mid = recover_macro(f_post, g_shape, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
-    delta_G = macro_before.E_tot - macro_mid.E_tot
-    # 局部模式在随体参考系交换平动/内部能量：用均值为 u 的分布补能，
-    # 避免静止权重 w 带来额外热流 -u*delta_G。
-    energy_weights = f_eq / macro_before.rho[..., None]
-    g_post = g_shape + delta_G[..., None] * energy_weights
+    if backend == 'numba':
+        from core.collision_numba import collide_prepared
+        key, weights = tuple(map(tuple, lattice.c)), tuple(lattice.w)
+        projectors = tuple(_fixed_zero_lower_projector(key, weights, kind)
+                           for kind in ('second', 'heat', 'first'))
+        f_post, g_post = collide_prepared(f, g, f_eq, g_eq, macro_before, transport,
+                                        mapping, lattice, projectors)
+    else:
+        f_post = _regularized_f_collision(
+            f, f_eq, macro_before.u, mapping, lattice, transport=transport)
+        f_post = _correct_f_conserved_moments(f_post, f, lattice)
+        f_post, g_shape = _regularized_heat_flux_collision(
+            f_post, g_eq, f, g, macro_before.u, mapping, lattice, transport=transport)
+        f_post = _correct_f_conserved_moments(f_post, f, lattice)
+        macro_mid = recover_macro(f_post, g_shape, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
+        delta_G = macro_before.E_tot - macro_mid.E_tot
+        # 在随体参考系交换平动/内部能量，避免额外的热流 -u*delta_G。
+        energy_weights = f_eq / macro_before.rho[..., None]
+        g_post = g_shape + delta_G[..., None] * energy_weights
 
     if not return_diagnostics:
         return f_post, g_post

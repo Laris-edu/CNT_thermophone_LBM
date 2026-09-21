@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
+from importlib.metadata import version
 import json
 from pathlib import Path
 import platform
@@ -65,6 +66,9 @@ def run_case(effective, output, *, source_cache=None, provenance=None):
         geometry='nx=1 planar upper half-space; z=(row+0.5)dx; open top; diffuse thermal bottom',
         audit_columns=['wall_mass_lu','top_mass_lu','wall_energy_J_m2','top_energy_J_m2',
             'mass_residual_lu','energy_residual_J_m2'])
+    manifest['collision_backend'] = config['numerics'].get('collision_backend', 'numpy')
+    if manifest['collision_backend'] == 'numba':
+        manifest.update(numba=version('numba'), llvmlite=version('llvmlite'))
     if run['mode']=='power':
         manifest.update(power_drive='P_mean*(1-cos(2*pi*f_power*t)); electrical frequency=f_power/2',
                         power=run['power'],film=run['film'],stopping=run['stopping'],

@@ -39,12 +39,13 @@ def expected_tau(s, rho, tr, channel):
     return .5 + diffusivity * factor / rho / (m.theta_ref_lu * tr)
 
 
-def test_local_density_and_temperature_change_actual_stress_relaxation():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_local_density_and_temperature_change_actual_stress_relaxation(backend):
     s, rho, tr = prepared_state()
     cx, cy = s.lattice.c.T
     basis = cx * cy
     f = s.f + 1e-6 * s.lattice.w * basis
-    fp, gp, diag = collide_fg(f, s.g, s.mapping, lattice=s.lattice, return_diagnostics=True)
+    fp, gp, diag = collide_fg(f, s.g, s.mapping, lattice=s.lattice, return_diagnostics=True, backend=backend)
     before = np.sum((f - s.f) * basis, axis=-1)
     after = np.sum((fp - s.f) * basis, axis=-1)
     np.testing.assert_allclose(after / before, 1 - 1 / expected_tau(s, rho, tr, "shear"), atol=2e-8)
@@ -52,11 +53,12 @@ def test_local_density_and_temperature_change_actual_stress_relaxation():
     assert fp.min() > 0 and gp.min() > 0
 
 
-def test_local_heat_relaxation_and_readout_use_the_same_tau():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_local_heat_relaxation_and_readout_use_the_same_tau(backend):
     s, rho, tr = prepared_state()
     g = s.g + 1e-6 * s.lattice.w * s.lattice.c[:, 0]
     q0 = central_energy_flux_lu(s.f, g, lattice=s.lattice)
-    fp, gp = collide_fg(s.f, g, s.mapping, lattice=s.lattice)
+    fp, gp = collide_fg(s.f, g, s.mapping, lattice=s.lattice, backend=backend)
     q1 = central_energy_flux_lu(fp, gp, lattice=s.lattice)
     tau = expected_tau(s, rho, tr, "thermal")
     np.testing.assert_allclose(q1[..., 0] / q0[..., 0], 1 - 1 / tau, atol=2e-8)
@@ -77,7 +79,8 @@ def test_local_mode_rejects_inconsistent_heat_capacity():
         create_unit_mapping(cfg)
 
 
-def test_moving_stressed_gas_preserves_heat_flux_relaxation_and_energy():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_moving_stressed_gas_preserves_heat_flux_relaxation_and_energy(backend):
     s, rho, tr = prepared_state()
     u = np.array([.03, -.02])
     s.initialize_from_macro(rho, u, tr * s.mapping.theta_ref_lu)
@@ -88,7 +91,7 @@ def test_moving_stressed_gas_preserves_heat_flux_relaxation_and_energy():
     before = recover_macro(f, g, lattice=s.lattice)
     coef = local_transport_coefficients(s.mapping, before.rho, before.theta)
     q0 = central_energy_flux_lu(f, g, lattice=s.lattice)
-    fp, gp, diag = collide_fg(f, g, s.mapping, lattice=s.lattice, return_diagnostics=True)
+    fp, gp, diag = collide_fg(f, g, s.mapping, lattice=s.lattice, return_diagnostics=True, backend=backend)
     q1 = central_energy_flux_lu(fp, gp, lattice=s.lattice)
     np.testing.assert_allclose(q1, coef.heat_flux_retention[..., None] * q0, atol=3e-13)
     assert np.max(np.abs(diag.energy_residual)) < 1e-13
@@ -123,8 +126,10 @@ def test_reference_state_recovers_reference_tau_and_nonzero_bulk_scales_locally(
 
 
 @pytest.mark.parametrize("model", ["constant", "sutherland"])
-def test_hdf5_export_preserves_fields_and_transport_metadata(tmp_path, model):
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_hdf5_export_preserves_fields_and_transport_metadata(tmp_path, model, backend):
     cfg = local_config(model)
+    cfg['numerics']['collision_backend'] = backend
     s = GasSolver2D(cfg)
     s.initialize_from_macro(1., np.zeros(2), s.mapping.theta_ref_lu)
     s.step(2)
@@ -133,6 +138,9 @@ def test_hdf5_export_preserves_fields_and_transport_metadata(tmp_path, model):
     with h5py.File(path, "r") as data:
         assert data.attrs["transport_mode"] == "local"
         assert data.attrs["transport_model"] == model
+        assert data.attrs['collision_backend'] == backend
+        if backend == 'numba':
+            assert data.attrs['numba'] and data.attrs['llvmlite']
         assert data["metadata/unit_mapping"].attrs["tau_metadata_scope"] == "reference_state"
         np.testing.assert_array_equal(data["fields/f"][:], s.f)
         np.testing.assert_allclose(data["fields/q_lu"][:], s.get_heat_flux_lu())

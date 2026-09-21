@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import lru_cache
+from importlib.metadata import version
 import subprocess
 from typing import Any
 
 import numpy as np
 
-from core.collision_smrt import collide_fg
+from core.collision_smrt import collide_fg, validate_collision_backend
 from core.equilibrium import equilibrium_fg
 from core.lattice import Lattice, make_lattice
 from core.macroscopic import ENERGY_CLOSURE_DEFINITION, MacroState, heat_flux_lu, recover_macro
@@ -88,6 +89,7 @@ class GasSolver2D:
         self.mapping: UnitMapping = create_unit_mapping(config)
         self.lattice: Lattice = make_lattice(self.mapping.lattice.velocity_set)
         numerics = config.get("numerics", {})
+        self.collision_backend = validate_collision_backend(numerics.get('collision_backend', 'numpy'))
         self.ny = int(numerics.get("ny", 4))
         self.nx = int(numerics.get("nx", 64))
         self.t_lu = 0
@@ -127,7 +129,7 @@ class GasSolver2D:
 
         for _ in range(int(n_steps)):
             f, g = self._require_state()
-            f_post, g_post = collide_fg(f, g, self.mapping, lattice=self.lattice)
+            f_post, g_post = collide_fg(f, g, self.mapping, lattice=self.lattice, backend=self.collision_backend)
             f_stream, g_stream = pull_stream_fg(f_post, g_post, lattice=self.lattice, y_axis=0, x_axis=1)
             if boundary_callback is not None:
                 f_stream, g_stream = boundary_callback(
@@ -161,6 +163,9 @@ class GasSolver2D:
         state = self.get_macro()
         q = self.get_heat_flux_lu()
         metadata = minimum_hdf5_metadata(self.mapping, self.case_name)
+        metadata['collision_backend'] = self.collision_backend
+        if self.collision_backend == 'numba':
+            metadata.update(numba=version('numba'), llvmlite=version('llvmlite'))
         with h5py.File(path, "w") as h5:
             write_metadata(h5, metadata)
             time_group = h5.create_group("time")

@@ -1,7 +1,9 @@
 """Short CPU benchmark, not a physical case or restart; writes one diagnostic NPZ."""
 import argparse
+from copy import deepcopy
 from dataclasses import astuple
 import hashlib
+from importlib.metadata import version
 import json
 from pathlib import Path
 import platform
@@ -56,19 +58,26 @@ def main():
     parser.add_argument('--steps', type=int, default=256)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--compare', type=Path)
+    parser.add_argument('--backend', choices=('numpy', 'numba'), default='numpy')
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     if args.steps <= 0 or args.repeats <= 0:
         raise ValueError('steps and repeats must be positive')
     config = load_study(Path(__file__).with_name('e1_study.yaml'))[0]
+    config['numerics']['collision_backend'] = args.backend
+    warmup_start = time.perf_counter()
     measure(config, False, 16)  # Warm up fixed projectors and imports.
+    warmup_s = time.perf_counter() - warmup_start
     source = capture_source(ROOT)
     metadata = dict(steps=args.steps, repeats=args.repeats,
         git_commit=source['git_commit'], git_dirty=source['git_dirty'],
         source_clean=source['source_clean'], source_sha256=source['source_sha256'],
         benchmark_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        python=platform.python_version(), numpy=np.__version__, config=config, timings={})
+        python=platform.python_version(), numpy=np.__version__, config=config, timings={},
+        collision_backend=args.backend, warmup_s=warmup_s)
+    if args.backend == 'numba':
+        metadata.update(numba=version('numba'), llvmlite=version('llvmlite'))
     arrays = {}
     for name, warm in [('cold', False), ('warm', True)]:
         timings = []
@@ -83,7 +92,11 @@ def main():
             old = json.loads(str(previous['metadata']))
             if old['steps'] != args.steps:
                 raise ValueError('comparison requires identical step counts')
-            if 'config' in old and old['config'] != config:
+            reference_config = deepcopy(old.get('config', config))
+            compared_config = deepcopy(config)
+            for compared in (reference_config, compared_config):
+                compared['numerics'].pop('collision_backend', None)
+            if reference_config != compared_config:
                 raise ValueError('comparison requires the same effective configuration')
             metadata['comparison'] = dict(reference=str(args.compare), max_abs={}, speedup={})
             for name, value in arrays.items():

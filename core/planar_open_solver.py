@@ -53,7 +53,7 @@ class PlanarOpenSolver(GasSolver2D):
         """
         f, g = self._require_state()
         mass0, energy0 = self._totals(f, g)
-        fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice)
+        fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice, backend=self.collision_backend)
         fn = pull_stream_open_y(fp, lattice=self.lattice)
         gn = pull_stream_open_y(gp, lattice=self.lattice)
         scale = self.mapping.pressure_scale * self.mapping.lattice.dx_m

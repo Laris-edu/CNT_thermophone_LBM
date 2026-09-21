@@ -49,8 +49,11 @@ def test_heated_wall_exchanges_energy_without_mass_and_outlet_is_counted():
     assert np.max(new.p)*m.pressure_scale > m.lattice.rho_ref_lu*m.theta_ref_lu*m.pressure_scale
 
 
-def test_outgoing_pulse_reflection_below_one_percent(tmp_path):
-    result=pulse_case(make_solver(),tmp_path)
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_outgoing_pulse_reflection_below_one_percent(tmp_path, backend):
+    solver = make_solver()
+    solver.config['numerics']['collision_backend'] = backend
+    result=pulse_case(type(solver)(solver.config),tmp_path)
     assert result['reflection_ratio']<.01
 
 

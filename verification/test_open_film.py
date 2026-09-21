@@ -44,9 +44,11 @@ def test_failed_wall_solve_leaves_state_time_and_audit_unchanged():
     assert solver.last_audit is audit
 
 
-def test_nonpositive_trial_gas_state_is_rejected_before_commit(monkeypatch):
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_nonpositive_trial_gas_state_is_rejected_before_commit(monkeypatch, backend):
     import core.planar_open_solver as module
     solver = make_solver(length=40e-6)
+    solver.collision_backend = backend
     solver.step_temperature(300.)
     f, g, time, audit = solver.f.copy(), solver.g.copy(), solver.t_lu, solver.last_audit
     original = module.characteristic_top
@@ -64,10 +66,12 @@ def test_nonpositive_trial_gas_state_is_rejected_before_commit(monkeypatch):
     assert solver.last_audit is audit
 
 
-def test_open_film_independent_storage_closes_with_both_outlet_and_leak():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_open_film_independent_storage_closes_with_both_outlet_and_leak(backend):
     from coupling.planar_open import step_open_film
 
     solver = make_solver(length=40e-6)
+    solver.collision_backend = backend
     mapping = solver.mapping
     params = FilmOdeParams(linear_leak_conductance_si=57.8)
     drive = SinusoidalDrive(1255.56, -1255.56, 20000)
@@ -97,10 +101,12 @@ def test_open_film_independent_storage_closes_with_both_outlet_and_leak():
     assert solver.t_lu == 160
 
 
-def test_unforced_open_film_remains_at_equilibrium():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_unforced_open_film_remains_at_equilibrium(backend):
     from coupling.planar_open import step_open_film
 
     solver = make_solver(length=40e-6)
+    solver.collision_backend = backend
     initial = solver.get_macro().p.copy()
     temperature = 300.
     for _ in range(32):
@@ -124,12 +130,15 @@ def test_invalid_or_unsolvable_power_does_not_commit(power):
     assert solver.t_lu == 0
 
 
-def test_small_signal_power_temperature_and_direct_pressure_match_independent_reference():
+@pytest.mark.parametrize('backend', ['numpy', 'numba'])
+def test_small_signal_power_temperature_and_direct_pressure_match_independent_reference(backend):
     from coupling.planar_open import step_open_film
     from postproc.diagnostics import compare, fit_window
     from reference.lim2013 import matched_gas, film_temperature_hat, exact_pressure_hat
 
     solver=make_solver(refine=2,length=200e-6)
+    solver.config['numerics']['collision_backend'] = backend
+    solver = type(solver)(solver.config)
     params=FilmOdeParams(linear_leak_conductance_si=57.8)
     frequency=20000.; amplitude=-50.; dt=solver.mapping.lattice.dt_s
     drive=SinusoidalDrive(0.,amplitude,frequency)
