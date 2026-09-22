@@ -19,11 +19,19 @@ from postproc.power import energy_balances
 from simulation.output import dump
 
 
-PROTOCOL = dict(window_cycles=10, assessment_windows=[[60,70],[70,80],[80,90],[90,100]],
+PROTOCOL = dict(window_cycles=10,
     temperature_absolute_K=.01, temperature_excess_relative=.01,
     velocity_absolute_m_s=1e-5, velocity_relative=.01,
     outlet_density_pressure_relative=1e-4, storage_power_relative=.01,
     power_change_relative=.01)
+
+
+def assessment_protocol(requested_cycles):
+    """Fix the last four full startup-aligned windows from the run request."""
+    width=PROTOCOL['window_cycles']
+    end=int(np.floor(float(requested_cycles)/width+1e-10))*width
+    windows=[[start,start+width] for start in range(end-4*width,end,width)] if end>=4*width else []
+    return dict(PROTOCOL,assessment_windows=windows)
 
 
 def mean_state(t, x, start, end):
@@ -59,6 +67,7 @@ def inspect_case(case):
 
 def assess(data,config,summary,manifest):
     run=config['run']; m=create_unit_mapping(config)
+    protocol=assessment_protocol(run['cycles'])
     f=run['frequency_Hz']; dt=m.lattice.dt_s; area=run['power']['area_m2']
     pin=run['power']['mean_W']; T0=m.physical.T0_K
     p0=summary['air']['p0_Pa']; rho0=m.physical.rho0_kg_m3
@@ -124,7 +133,7 @@ def assess(data,config,summary,manifest):
             velocity_max_difference_m_s=du,velocity_limit_m_s=velocity_limit,
             max_power_difference_W=power_change,outlet_density_relative_difference=density_change,
             outlet_pressure_relative_difference=pressure_change,gates=gates,passed=all(gates.values())))
-    selected=[j for j,w in enumerate(windows) if [w['start_cycle'],w['end_cycle']] in PROTOCOL['assessment_windows']]
+    selected=[j for j,w in enumerate(windows) if [w['start_cycle'],w['end_cycle']] in protocol['assessment_windows']]
     eligible=len(selected)==4
     storage_checks=[dict(window=[windows[j]['start_cycle'],windows[j]['end_cycle']],
         film=abs(windows[j]['film_storage_rate_W'])<.01*pin,
@@ -142,7 +151,7 @@ def assess(data,config,summary,manifest):
     result=dict(status=manifest['status'],validation_passed=summary['validation_passed'],
         periodic_response_stable=summary['periodic_response_stable'],
         mean_thermal_assessed=eligible,mean_thermal_stable=passed if eligible else None,
-        observation_protocol=PROTOCOL,storage_checks=storage_checks,
+        observation_protocol=protocol,storage_checks=storage_checks,
         assessment_transitions=selected_transitions,numerical_gates=numeric_gates,
         all_window_transitions=transitions,energy_J=energy,
         source=dict(run_git_commit=manifest['git_commit'],git_dirty_at_start=manifest['git_dirty'],
