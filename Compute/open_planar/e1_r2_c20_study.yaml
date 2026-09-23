@@ -1,0 +1,38 @@
+base_config: e1_long_air.yaml
+defaults:
+  mode: power
+  frequency_Hz: 20000.0
+  power:
+    mean_W: 1.13
+    area_m2: 0.0009
+  film:
+    C_A_J_m2K: 0.0007
+    G_W_m2K: 57.8
+    gas_flux_factor: 2.0
+    T_ref_K: 300.0
+    initial_temperature_K: 300.0
+  refine: 2
+  length_m: 0.001
+  cycles: 20
+  probes_m: [0.00012, 0.00030, 0.00060]
+  stopping:
+    first_diagnostic_cycle: 6
+    first_stable_cycle: 8
+    stop_when_stable: false
+  sampling:
+    profile_samples_per_cycle: 32
+cases:
+  - name: e1_power_f20000_r2_c20_cold
+
+# One cold-start case: 20 acoustic cycles = 1 ms. Numba is in base numerics.
+# Keep all public numerical gates unchanged. Compare to the existing r4 cold
+# trajectory over the same first 20 cycles; do not run another r4 case.
+# Harmonics: common cycle 18-20 window, exp(+i omega t), no phase correction.
+# Exploratory grid-comparison limits: amplitude difference <=5%, phase <=5 deg
+# for film temperature, actual one-side wall exchange, and each pressure probe.
+# Mean states and energy exchanges: common cycle 10-20 window. Film temperature
+# difference <=5% of the r4 temperature excess; temperature-profile max difference
+# <=5% of the r4 maximum mean profile excess. Interpolate r4 profiles to r2 centers.
+# Report native probe coordinates, flow differences and energy balances separately.
+# These comparison limits do not replace public gates or prove long-time accuracy,
+# continuum-grid convergence, warm-outlet validity or finite-film radiation.
