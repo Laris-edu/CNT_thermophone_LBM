@@ -111,14 +111,24 @@ def figures(data,config,summary,result,windows,profiles,cycles,balances):
     fig,axes=page('Ten-cycle means test continued thermal and flow evolution')
     z=data['z_m']*1e3
     cmap=plt.get_cmap('viridis')
+    norm=matplotlib.colors.Normalize(vmin=wt[0],vmax=wt[-1])
     for j,(w,profile) in enumerate(zip(windows,profiles)):
-        color=cmap(j/max(1,len(windows)-1)); label=f"{w['start_cycle']}-{w['end_cycle']}"
+        color=cmap(norm(w['mid_time_ms'])); label=f"{w['start_cycle']}-{w['end_cycle']}"
         axes[0,0].plot(z,profile['temperature_K']-T0,color=color,label=label)
         axes[0,1].plot(z,profile['velocity_m_s'],color=color)
     axes[0,0].set_ylabel(r'$\langle T\rangle-T_0$ (K)'); axes[0,0].set_xlabel('Distance (mm)')
-    legend(axes[0,0],ncol=5,columnspacing=.5)
+    if len(windows)<=10:
+        legend(axes[0,0],ncol=5,columnspacing=.5)
+    else:
+        color_axis=fig.add_axes([.23,.875,.62,.014])
+        colorbar=fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm,cmap=cmap),
+            cax=color_axis,orientation='horizontal')
+        colorbar.set_label('10-cycle window midpoint (ms)',fontsize=8,labelpad=3)
+        colorbar.ax.xaxis.set_label_position('top')
+        colorbar.ax.tick_params(labelsize=8,pad=2)
     axes[0,1].set_ylabel(r'$\langle u_y\rangle$ (m s$^{-1}$)'); axes[0,1].set_xlabel('Distance (mm)')
-    axes[0,1].set_title('Same window colours as temperature',fontsize=8,pad=9)
+    if len(windows)<=10:
+        axes[0,1].set_title('Same window colours as temperature',fontsize=8,pad=9)
     transitions=result['all_window_transitions']; tt=[s['current_window'][1]/frequency*1e3 for s in transitions]
     for key,label,color in [('film','Film',COLORS[0]),('profile','Temperature profile',COLORS[1])]:
         vals=[s['film_difference_K']/s['film_limit_K'] if key=='film' else s['profile_max_difference_K']/s['profile_limit_K'] for s in transitions]
@@ -133,7 +143,8 @@ def figures(data,config,summary,result,windows,profiles,cycles,balances):
     axes[1,1].set_xlabel('Window end time (ms)'); legend(axes[1,1])
     yield 'mean_profiles',fig
 
-    fig,axes=page('Actual energy exchanges close against independent storage')
+    fig,axes=page('Energy balance passes; cumulative mass balance fails' if not
+        summary['gates']['cumulative_mass_audit'] else 'Actual energy exchanges close against independent storage')
     quantities=[(np.cumsum(data['input_energy_J_m2']),'Input'),
         (balances['film_storage']+2*balances['gas_storage'],'Film + gas storage'),
         (np.cumsum(data['leak_energy_J_m2']),'Additional leak'),
@@ -203,7 +214,8 @@ def main():
             fig.text(.5,.935,state,ha='center',fontsize=7.4)
             fig.canvas.draw()
             require_matplotlib_panel_alignment(fig,json_out=qa/f'{name}.alignment.json',strict=True,
-                      tolerance_pt=1.5,gutter_tolerance_pt=1.5,require_panel_labels=True)
+                      tolerance_pt=1.5,gutter_tolerance_pt=1.5,require_panel_labels=True,
+                      exclude_axes=[ax for ax in fig.axes if hasattr(ax,'_colorbar')])
             fig.savefig(output/f'e1_long_{name}.png',dpi=300)
             fig.savefig(output/f'e1_long_{name}.svg')
             pdf.savefig(fig,dpi=300)

@@ -1,4 +1,4 @@
-"""Read-only E1 mean-thermal assessment; protocol fixed in e1_long_study.yaml.
+"""Read-only E1 mean-thermal assessment; protocol fixed in the study YAML.
 
 Endpoint states are integrated piecewise linearly. Exchange energies are
 interval sums, never trapezoid-integrated again. All reported gas storage is
@@ -8,6 +8,8 @@ import argparse
 import csv
 import hashlib
 import json
+import math
+from copy import deepcopy
 from pathlib import Path
 import subprocess
 
@@ -16,6 +18,7 @@ import numpy as np
 from config_io import load_config
 from core.unit_mapping import create_unit_mapping
 from postproc.power import energy_balances
+from postproc.multiharmonic_fit import fit_multiharmonic
 from simulation.output import dump
 
 
@@ -121,7 +124,8 @@ def assess(data,config,summary,manifest):
         film_limit=min(.01,.01*abs(now['film_temperature_K']-T0))
         profile_limit=min(.01,.01*float(abs(newp['temperature_K']-T0).max()))
         velocity_limit=max(1e-5,.01*float(abs(newp['velocity_m_s']).max()))
-        power_change=max(abs(now[k]-old[k]) for k in ('two_side_wall_W','leak_W','two_side_outlet_export_W'))
+        power_differences={k:now[k]-old[k] for k in ('two_side_wall_W','leak_W','two_side_outlet_export_W')}
+        power_change=max(abs(value) for value in power_differences.values())
         density_change=abs(now['outlet_density_kg_m3']-old['outlet_density_kg_m3'])/rho0
         pressure_change=abs(now['outlet_pressure_Pa']-old['outlet_pressure_Pa'])/p0
         gates=dict(film_temperature=dT<film_limit,temperature_profile=dprofile<profile_limit,
@@ -131,7 +135,8 @@ def assess(data,config,summary,manifest):
             current_window=[now['start_cycle'],now['end_cycle']],film_difference_K=dT,
             film_limit_K=film_limit,profile_max_difference_K=dprofile,profile_limit_K=profile_limit,
             velocity_max_difference_m_s=du,velocity_limit_m_s=velocity_limit,
-            max_power_difference_W=power_change,outlet_density_relative_difference=density_change,
+            max_power_difference_W=power_change,power_differences_W=power_differences,
+            outlet_density_relative_difference=density_change,
             outlet_pressure_relative_difference=pressure_change,gates=gates,passed=all(gates.values())))
     selected=[j for j,w in enumerate(windows) if [w['start_cycle'],w['end_cycle']] in protocol['assessment_windows']]
     eligible=len(selected)==4
@@ -173,6 +178,41 @@ def assess(data,config,summary,manifest):
             velocity_m_s=windows[-1]['outlet_velocity_m_s'],
             mach=windows[-1]['outlet_velocity_m_s']/m.physical.c0_m_s,
             pressure_Pa=windows[-1]['outlet_pressure_Pa']-p0)
+    # Separate background drift from the periodic outlet fluctuation. The fit
+    # uses saved endpoint states and the public three-harmonic + linear model.
+    result['outlet_window_statistics']=[]
+    for j in selected:
+        w=windows[j]; start=w['start_cycle']/f; end=w['end_cycle']/f
+        a=int(round(start/dt)); z=int(round(end/dt)); ts=t[a:z+1]
+        item=dict(window=[w['start_cycle'],w['end_cycle']],channels={})
+        for key in ('outlet_temperature_K','outlet_density_kg_m3','outlet_velocity_m_s','outlet_pressure_Pa'):
+            values=states[key][a:z+1]; average=w[key]
+            fit=fit_multiharmonic(ts,values,2*np.pi*f,n_harmonics=3,detrend_order=1)
+            item['channels'][key]=dict(mean=average,minimum=float(values.min()),maximum=float(values.max()),
+                rms_about_mean=float(np.sqrt(np.trapezoid((values-average)**2,ts)/(end-start))),
+                drift_per_s=float(fit.trend_coeffs_raw[1]),
+                fundamental_amplitude=float(abs(fit.harmonic(1))),
+                phase_relative_power_deg=float(np.angle(-fit.harmonic(1),deg=True)),
+                residual_rms=float(fit.residual_rms),
+                mean_change_from_previous_window=None if j==0 else average-windows[j-1][key])
+        result['outlet_window_statistics'].append(item)
+    result['outlet_statistics_definition']='Endpoint min/max and time-weighted RMS include drift; fundamental and drift are separated by a three-harmonic + linear fit, exp(+i omega t).'
+    result['gas_final_decomposition_J_m2']=dict(total_storage=float(U[-1]+K[-1]-U[0]-K[0]),
+        sensible_excess=float(sensible[-1]),cold_mass_energy_change=float(cv*T0*(mass[-1]-mass[0])),
+        kinetic_change=float(K[-1]-K[0]),mass_change_kg_m2=float(mass[-1]-mass[0]),
+        mass_change_fraction=float(mass[-1]/mass[0]-1))
+    exchange=data['audit'][:,0]+data['audit'][:,1]
+    mass_residual=data['mass_lu']-float(data['initial_mass_lu'])-np.cumsum(exchange)
+    crossing=np.flatnonzero(abs(mass_residual)>=run['analysis']['cumulative_mass_lu'])
+    maximum_index=int(np.argmax(abs(mass_residual)))
+    result['cumulative_mass_check']=dict(limit_lu=run['analysis']['cumulative_mass_lu'],
+        max_abs_lu=float(abs(mass_residual[maximum_index])),
+        max_relative_to_initial_mass=float(abs(mass_residual[maximum_index])/float(data['initial_mass_lu'])),
+        first_crossing_time_ms=None if not len(crossing) else float(data['t_s'][crossing[0]]*1e3),
+        first_crossing_cycle=None if not len(crossing) else float(data['t_s'][crossing[0]]*f),
+        final_residual_lu=float(mass_residual[-1]),
+        final_residual_fsum_lu=float(data['mass_lu'][-1]-float(data['initial_mass_lu'])-math.fsum(exchange)),
+        passed=bool(summary['gates']['cumulative_mass_audit']))
     cycles=[]
     for cycle in range(ncycles):
         a=int(round(cycle/f/dt)); z=int(round((cycle+1)/f/dt))
@@ -182,6 +222,35 @@ def assess(data,config,summary,manifest):
             pressure_min_Pa=data['pressure_Pa'][a:z].min(axis=0),
             pressure_max_Pa=data['pressure_Pa'][a:z].max(axis=0)))
     return result,windows,profiles,cycles,b
+
+
+def compare_overlap(data,config,manifest,reference_case):
+    """Compare saved cold-start samples without rerunning either solver."""
+    old,oldconfig,_,oldmanifest=inspect_case(reference_case)
+    configs=[deepcopy(c) for c in (config,oldconfig)]
+    for c in configs:
+        c['case'].pop('name'); c['run'].pop('cycles'); c['numerics'].pop('steps')
+    if configs[0]!=configs[1]:
+        raise ValueError('overlap comparison requires identical physics, grid and sampling')
+    if manifest['source_sha256']!=oldmanifest['source_sha256']:
+        raise ValueError('overlap comparison requires identical recorded public source hashes')
+    count=len(old['t_s']); profile_count=len(old['profile_t_s'])
+    if len(data['t_s'])<count:
+        raise ValueError('new trajectory does not cover the reference duration')
+    keys=('t_s','heat_time_s','film_temperature_K','wall_temperature_K','pressure_Pa','velocity_m_s',
+        'input_energy_J_m2','leak_energy_J_m2','wall_flux_W_m2','gas_energy_J_m2','mass_lu','audit',
+        'outlet_temperature_K','outlet_density_kg_m3','outlet_velocity_m_s','outlet_pressure_Pa',
+        'profile_t_s','profile_temperature_K','profile_density_kg_m3','profile_velocity_m_s','profile_pressure_Pa')
+    differences={}
+    for key in keys:
+        current=data[key][:profile_count if key.startswith('profile_') else count]
+        if current.shape!=old[key].shape:
+            raise ValueError(f'overlap shape mismatch: {key}')
+        differences[key]=float(np.max(abs(current-old[key])))
+    return dict(reference_case=str(reference_case.resolve()),reference_git_commit=oldmanifest['git_commit'],
+        duration_ms=float(old['t_s'][-1]*1e3),steps=count,profile_samples=profile_count,
+        configuration_equal_except_name_duration=True,public_source_hashes_equal=True,
+        max_absolute_differences=differences,all_samples_exactly_equal=all(v==0 for v in differences.values()))
 
 
 def write_tables(output,result,windows):
@@ -197,12 +266,15 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case-dir',type=Path,required=True)
     parser.add_argument('--output-dir',type=Path)
+    parser.add_argument('--compare-case',type=Path,help='completed shorter cold-start case for samplewise comparison')
     args=parser.parse_args(); case=args.case_dir.resolve()
     output=args.output_dir or case.parent.parent/'final'
     if (output/'mean_thermal_summary.json').exists():
         raise FileExistsError('analysis exists; use a new output directory')
     data,config,summary,manifest=inspect_case(case)
     result,windows,profiles,cycles,balances=assess(data,config,summary,manifest)
+    if args.compare_case:
+        result['overlap_comparison']=compare_overlap(data,config,manifest,args.compare_case)
     result['source'].update(analysis_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         analysis_git_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())
     write_tables(output,result,windows)
