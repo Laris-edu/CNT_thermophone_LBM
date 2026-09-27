@@ -189,6 +189,47 @@ def test_thermal_custom_probes_and_read_only_reanalysis(tmp_path):
     assert hashes=={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
 
 
+@pytest.mark.parametrize('interrupt_after', [None, 2])
+def test_thermal_velocity_samples_match_committed_normal_velocity(tmp_path, monkeypatch, interrupt_after):
+    from core.planar_open_solver import PlanarOpenSolver
+    from simulation import prepare_case
+    from simulation.planar import collect_thermal
+
+    config=prepare_case(dict(name='velocity',refine=1,length_m=.00015,frequency_Hz=200000.,
+        probes_m=[.00003,.00008],cycles=2.,ramp_cycles=0.,
+        sampling={'profile_samples_per_cycle':4096}))
+    solver=PlanarOpenSolver(config)
+    mapping=solver.mapping
+    initial=solver.get_macro()
+    velocity=initial.u.copy()
+    velocity[...,0]=3e-5/mapping.velocity_scale
+    velocity[...,1]=-1e-4/mapping.velocity_scale
+    solver.initialize_from_macro(initial.rho,velocity,initial.theta)
+    expected=[]
+    original=solver.step_temperature
+    def step(temperature):
+        if interrupt_after is not None and len(expected)==interrupt_after:
+            raise RuntimeError('interrupted sampling')
+        audit=original(temperature)
+        expected.append(solver.get_macro().u[:,0,1].copy()*mapping.velocity_scale)
+        return audit
+    monkeypatch.setattr(solver,'step_temperature',step)
+    run=config['run'].copy()
+    run['cycles']=4*mapping.lattice.dt_s*run['frequency_Hz']
+    if interrupt_after is None:
+        collect_thermal(solver,tmp_path,run)
+    else:
+        with pytest.raises(RuntimeError,match='interrupted sampling'):
+            collect_thermal(solver,tmp_path,run)
+    with np.load(tmp_path/'trajectory.npz') as data:
+        rows=[np.argmin(abs(solver.z_m-z)) for z in run['probes_m']]
+        np.testing.assert_array_equal(data['velocity_m_s'],np.asarray(expected)[:,rows])
+        np.testing.assert_array_equal(data['profile_velocity_m_s'],expected)
+        np.testing.assert_array_equal(data['profile_t_s'],data['t_s'])
+        np.testing.assert_allclose(data['t_s'],np.arange(1,len(expected)+1)*mapping.lattice.dt_s)
+        assert bool(data['run_completed']) is (interrupt_after is None)
+
+
 def test_failed_numerical_gate_is_still_a_completed_run(tmp_path):
     from simulation import prepare_case, run_case
     config=prepare_case(dict(name='pulse',mode='pulse',refine=1,analysis={'reflection_ratio':1e-12}))

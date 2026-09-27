@@ -60,7 +60,8 @@ def collect_thermal(solver, output, run):
     history,audits=[],[]; started=time.perf_counter(); last_cycle=0; completed=False
     initial=solver.get_macro(); initial_mass=float(np.sum(initial.rho))
     initial_energy=float(np.sum(initial.E_tot)*m.pressure_scale*m.lattice.dx_m)
-    min_f=min_g=float('inf'); profile_t,profile_T,profile_p=[],[],[]
+    min_f=min_g=float('inf'); profile_t,profile_T,profile_p,profile_u=[],[],[],[]
+    velocities=[]
     try:
         for i in range(steps):
             tq=(i+.5)*dt
@@ -71,12 +72,14 @@ def collect_thermal(solver, output, run):
             history.append([(i+1)*dt,tq,Tw,audit.wall_energy_J_m2/dt,*state.p[rows,0]*m.pressure_scale,
                 state.theta[0,0]*m.temperature_scale,float(np.sum(state.rho)),
                 float(np.sum(state.E_tot)*m.pressure_scale*m.lattice.dx_m)])
+            velocities.append(state.u[rows,0,1]*m.velocity_scale)
             audits.append(list(asdict(audit).values()))
             if ((i+1)*dt*frequency >= cycles-run['sampling']['profile_cycles']
                 and i % max(1,int(1/(frequency*dt*run['sampling']['profile_samples_per_cycle']))) == 0):
                 profile_t.append((i+1)*dt)
                 profile_T.append(state.theta[:,0]*m.temperature_scale)
                 profile_p.append(state.p[:,0]*m.pressure_scale)
+                profile_u.append(state.u[:,0,1]*m.velocity_scale)
             current=int((i+1)*dt*frequency)
             if current>last_cycle:
                 print(f'  cycle {current}/{cycles:g}, {time.perf_counter()-started:.1f} s',flush=True)
@@ -90,6 +93,8 @@ def collect_thermal(solver, output, run):
             initial_mass_lu=initial_mass,initial_gas_energy_J_m2=initial_energy,z_m=solver.z_m,
             profile_t_s=np.asarray(profile_t),profile_temperature_K=np.asarray(profile_T).reshape(-1,solver.ny),
             profile_pressure_Pa=np.asarray(profile_p).reshape(-1,solver.ny),min_f=min_f,min_g=min_g,
+            velocity_m_s=np.asarray(velocities).reshape(-1,count),
+            profile_velocity_m_s=np.asarray(profile_u).reshape(-1,solver.ny),
             run_completed=completed,elapsed_s=time.perf_counter()-started)
         np.savez_compressed(output/'trajectory.npz',**data)
     return data

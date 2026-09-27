@@ -8,8 +8,7 @@
 `Compute/<专题>/` 放算例参数、必要的短脚本与计算结果。日常新增频率、功率、网格等
 算例时，优先改算例配置，不复制或另写求解器。Agent 工作规则见 [AGENTS.md](AGENTS.md)。
 
-当前气体模型只支持 **D2Q37 + 局部输运**。D2Q21、`transport.mode: frozen`、
-手动标定的固定热流系数与 Galilean 热流修正已退役。
+当前气体模型只支持 **D2Q37 + 局部输运**。D2Q21、`transport.mode: frozen`、手动标定的固定热流系数与 Galilean 热流修正已退役。
 
 ## 1. 现有代码覆盖到哪里
 
@@ -194,6 +193,8 @@ sweeps:
 不传 `--case` 会顺序执行全部算例，计算异常会停止后续运行。完整热声扫描可能耗时较长。
 采样与分析默认值由 [simulation/study.py](simulation/study.py) 定义，并完整写入 `effective.yaml`；
 默认使用末两个周期窗口检查稳定性，保留末两周期剖面与逐步探针、收支数据。
+给温算例还保存步末探针法向速度 `velocity_m_s`（正向为膜到出口）与同一剖面时刻的
+`profile_velocity_m_s`；分别与 `pressure_Pa`、`profile_pressure_Pa` 同形同时间。
 
 ## 5. 在自己的 Python 脚本里调用
 
