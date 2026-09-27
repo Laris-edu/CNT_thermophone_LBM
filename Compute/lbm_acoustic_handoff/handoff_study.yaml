@@ -1,0 +1,30 @@
+base_config: gas.yaml
+
+defaults:
+  mode: thermal
+  frequency_Hz: 50000.0
+  amplitude_K: 0.1
+  refine: 4
+  cycles: 6
+  ramp_cycles: 2
+  probes_m: [0.00008, 0.00012, 0.00016]
+  sampling:
+    profile_cycles: 3
+    profile_samples_per_cycle: 128
+cases:
+  - name: thermal_f50000_r4_h0p2mm_c6
+    length_m: 0.0002
+  - name: thermal_f50000_r4_h0p3mm_c6
+    length_m: 0.0003
+
+# Compare window [4,6) against the saved 1 mm / 20-cycle trajectory.
+# That reference passed [4,6), [10,12), [18,20) harmonic convergence.
+# Independently check short-domain windows [3,4), [4,5), [5,6):
+# harmonic amplitude <=0.1%, phase <=0.1 deg, including detrend sensitivity.
+# Planar handoff: p+=(p+rho*c*u_normal)/2, exp(-i*omega*distance/c).
+# Targets are the reference's actual cells nearest 0.30 and 0.60 mm.
+# Preregistered handoff limits: amplitude <=1%, phase <=1 deg;
+# incoming/outgoing amplitude ratio <=1%; actual wall-flux change <=1%/1 deg.
+# Check long-domain propagation, truncation, and interface-location dependence
+# separately. Preserve original total-pressure comparisons and public gates.
+# No fitted sound speed, phase correction, gain, or geometric 1/r spreading.

@@ -1,0 +1,84 @@
+case:
+  name: thermal_f50000_r4_h1mm_c20
+  purpose: single-sided open planar thermal
+collision:
+  bulk_viscosity_policy: diagnostic_zero
+  central_moment_closure: second_order
+  deviatoric_stress_policy: measured
+  high_order_relaxation: 1.0
+  nu_b_lu: auto
+  regularized_heat_flux_f_fraction: 0.5714285714285714
+  regularized_shear_normal_factor: 1.0
+  regularized_shear_xy_factor: 1.0
+  trace_bulk_policy: tau22
+  trace_bulk_scale: 1.0
+lattice:
+  D: 2
+  Q: 37
+  S: 3
+  dt_s: 1.8601190476190478e-09
+  dx_m: 6.529375e-07
+  rho_ref_lu: 1.0
+  theta_q_lu: 0.6979533220196852
+  theta_ref_policy: physical_sound_speed
+  theta_transport_policy: theta_ref_lu
+  velocity_set: D2Q37
+numerics:
+  boundary: planar_open_y
+  collision_backend: numba
+  nx: 1
+  ny: 1532
+  precision: float64
+  steps: 215040
+  streaming: pull
+physical:
+  T0_K: 300.0
+  c0_m_s: 347.0
+  cp_J_kgK: 1003.4083333333333
+  gamma: 1.4
+  kg_W_mK: 0.0263
+  nu0_m2_s: 1.57e-05
+  p0_Pa: 101325.0
+  rho0_kg_m3: 1.177
+run:
+  amplitude_K: 0.1
+  analysis:
+    amplitude_percent: 5.0
+    cumulative_energy_J_m2: 1.0e-08
+    cumulative_mass_lu: 1.0e-08
+    detrend_order: 1
+    energy_residual_J_m2: 1.0e-10
+    harmonics: 3
+    mass_residual_lu: 1.0e-10
+    phase_deg: 5.0
+    reflection_ratio: 0.01
+    stationary_relative: 0.01
+    wall_mass_lu: 1.0e-12
+    window_cycles: 1.0
+  cycles: 20
+  frequency_Hz: 50000.0
+  length_m: 0.001
+  mode: thermal
+  probes_m:
+  - 8.0e-05
+  - 0.00012
+  - 0.00016
+  - 0.0003
+  - 0.0006
+  pulse:
+    center_fraction: 0.3
+    duration_crossings: 1.65
+    epsilon: 1.0e-05
+    probe_fraction: 0.65
+    width_fraction: 0.045
+    window_fraction: 0.16
+  ramp_cycles: 2
+  refine: 4
+  sampling:
+    profile_cycles: 20
+    profile_samples_per_cycle: 128
+transport:
+  mode: local
+  model: sutherland
+  sutherland_k_K: 194.0
+  sutherland_mu_K: 111.0

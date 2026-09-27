@@ -1,0 +1,485 @@
+{
+  "status": "completed",
+  "validation_passed": true,
+  "periodic_response_stable": true,
+  "mean_thermal_assessed": true,
+  "mean_thermal_stable": false,
+  "observation_protocol": {
+    "window_cycles": 10,
+    "assessment_windows": [
+      [
+        60,
+        70
+      ],
+      [
+        70,
+        80
+      ],
+      [
+        80,
+        90
+      ],
+      [
+        90,
+        100
+      ]
+    ],
+    "temperature_absolute_K": 0.01,
+    "temperature_excess_relative": 0.01,
+    "velocity_absolute_m_s": 1e-05,
+    "velocity_relative": 0.01,
+    "outlet_density_pressure_relative": 0.0001,
+    "storage_power_relative": 0.01,
+    "power_change_relative": 0.01
+  },
+  "storage_checks": [
+    {
+      "window": [
+        60,
+        70
+      ],
+      "film": true,
+      "gas": true
+    },
+    {
+      "window": [
+        70,
+        80
+      ],
+      "film": true,
+      "gas": true
+    },
+    {
+      "window": [
+        80,
+        90
+      ],
+      "film": true,
+      "gas": true
+    },
+    {
+      "window": [
+        90,
+        100
+      ],
+      "film": true,
+      "gas": true
+    }
+  ],
+  "assessment_transitions": [
+    {
+      "previous_window": [
+        60,
+        70
+      ],
+      "current_window": [
+        70,
+        80
+      ],
+      "film_difference_K": 0.326263911701119,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.3484482606899064,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 7.02132390506718e-05,
+      "velocity_limit_m_s": 1.2961572381737591e-05,
+      "max_power_difference_W": 0.016972248686692892,
+      "outlet_density_relative_difference": 0.00013685504080674583,
+      "outlet_pressure_relative_difference": 1.0844126615347138e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        70,
+        80
+      ],
+      "current_window": [
+        80,
+        90
+      ],
+      "film_difference_K": 0.29532458721871535,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.3178038103855556,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 6.105436907153066e-05,
+      "velocity_limit_m_s": 1.2717712878533521e-05,
+      "max_power_difference_W": 0.015362785027118686,
+      "outlet_density_relative_difference": 0.0001863532279253656,
+      "outlet_pressure_relative_difference": 9.815049953109262e-08,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        80,
+        90
+      ],
+      "current_window": [
+        90,
+        100
+      ],
+      "film_difference_K": 0.270099934330176,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.2928132713600462,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 5.36205608577527e-05,
+      "velocity_limit_m_s": 1.2494649191998567e-05,
+      "max_power_difference_W": 0.014050598583854268,
+      "outlet_density_relative_difference": 0.00023465645185772916,
+      "outlet_pressure_relative_difference": 8.97713637755925e-08,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    }
+  ],
+  "numerical_gates": {
+    "impermeable_wall": true,
+    "mass_audit": true,
+    "cumulative_mass_audit": true,
+    "energy_audit": true,
+    "cumulative_energy_audit": true,
+    "positive_populations": true,
+    "finite_state": true
+  },
+  "all_window_transitions": [
+    {
+      "previous_window": [
+        0,
+        10
+      ],
+      "current_window": [
+        10,
+        20
+      ],
+      "film_difference_K": 1.3173340972478513,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 1.3260245965327613,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 0.0005330088191045596,
+      "velocity_limit_m_s": 1.540994956843664e-05,
+      "max_power_difference_W": 0.06852771973883594,
+      "outlet_density_relative_difference": 3.0857974394118113e-07,
+      "outlet_pressure_relative_difference": 4.295280269950133e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        10,
+        20
+      ],
+      "current_window": [
+        20,
+        30
+      ],
+      "film_difference_K": 0.7815536542634618,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.7984113330104492,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 0.0002471553759696548,
+      "velocity_limit_m_s": 1.476719268425281e-05,
+      "max_power_difference_W": 0.04065642109478565,
+      "outlet_density_relative_difference": 5.105061496141014e-07,
+      "outlet_pressure_relative_difference": 2.593202547897303e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        20,
+        30
+      ],
+      "current_window": [
+        30,
+        40
+      ],
+      "film_difference_K": 0.5937325123605319,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.6128302463916953,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 0.00016378680419768107,
+      "velocity_limit_m_s": 1.4277891032727742e-05,
+      "max_power_difference_W": 0.03088596529299123,
+      "outlet_density_relative_difference": 4.435667331329994e-06,
+      "outlet_pressure_relative_difference": 1.973733565454244e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        30,
+        40
+      ],
+      "current_window": [
+        40,
+        50
+      ],
+      "film_difference_K": 0.4871365003143069,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.5075169832834376,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 0.00012293191581445645,
+      "velocity_limit_m_s": 1.3876079493518754e-05,
+      "max_power_difference_W": 0.02534084074634832,
+      "outlet_density_relative_difference": 1.9248976375101906e-05,
+      "outlet_pressure_relative_difference": 1.620084488553939e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        40,
+        50
+      ],
+      "current_window": [
+        50,
+        60
+      ],
+      "film_difference_K": 0.41640308329920117,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.43761567151733516,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 9.846862485582842e-05,
+      "velocity_limit_m_s": 1.3532456091461877e-05,
+      "max_power_difference_W": 0.021661288393227562,
+      "outlet_density_relative_difference": 4.846191674125726e-05,
+      "outlet_pressure_relative_difference": 1.384658025149798e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        50,
+        60
+      ],
+      "current_window": [
+        60,
+        70
+      ],
+      "film_difference_K": 0.3652835044539984,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.3870657290278814,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 8.208247683940827e-05,
+      "velocity_limit_m_s": 1.3230936054683736e-05,
+      "max_power_difference_W": 0.01900204790169835,
+      "outlet_density_relative_difference": 8.936387208328238e-05,
+      "outlet_pressure_relative_difference": 1.2143467906680152e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": true,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        60,
+        70
+      ],
+      "current_window": [
+        70,
+        80
+      ],
+      "film_difference_K": 0.326263911701119,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.3484482606899064,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 7.02132390506718e-05,
+      "velocity_limit_m_s": 1.2961572381737591e-05,
+      "max_power_difference_W": 0.016972248686692892,
+      "outlet_density_relative_difference": 0.00013685504080674583,
+      "outlet_pressure_relative_difference": 1.0844126615347138e-07,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        70,
+        80
+      ],
+      "current_window": [
+        80,
+        90
+      ],
+      "film_difference_K": 0.29532458721871535,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.3178038103855556,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 6.105436907153066e-05,
+      "velocity_limit_m_s": 1.2717712878533521e-05,
+      "max_power_difference_W": 0.015362785027118686,
+      "outlet_density_relative_difference": 0.0001863532279253656,
+      "outlet_pressure_relative_difference": 9.815049953109262e-08,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    },
+    {
+      "previous_window": [
+        80,
+        90
+      ],
+      "current_window": [
+        90,
+        100
+      ],
+      "film_difference_K": 0.270099934330176,
+      "film_limit_K": 0.01,
+      "profile_max_difference_K": 0.2928132713600462,
+      "profile_limit_K": 0.01,
+      "velocity_max_difference_m_s": 5.36205608577527e-05,
+      "velocity_limit_m_s": 1.2494649191998567e-05,
+      "max_power_difference_W": 0.014050598583854268,
+      "outlet_density_relative_difference": 0.00023465645185772916,
+      "outlet_pressure_relative_difference": 8.97713637755925e-08,
+      "gates": {
+        "film_temperature": false,
+        "temperature_profile": false,
+        "mean_velocity": false,
+        "power_change": false,
+        "outlet_density": false,
+        "outlet_pressure": true
+      },
+      "passed": false
+    }
+  ],
+  "energy_J": {
+    "film_storage": 4.1131199519774325e-06,
+    "one_side_gas_storage": -4.2792460109808414e-07,
+    "input": 0.005649999999999999,
+    "leak": 0.0012551033195572904,
+    "one_side_wall": 0.002195391780245378,
+    "one_side_outlet_into_gas": -0.0021958197052163154,
+    "two_side_gas_storage": -8.558492021961683e-07,
+    "two_side_wall": 0.004390783560490756,
+    "two_side_outlet_export": 0.004391639410432631,
+    "total_independent_balance_residual": 7.397027560786251e-13
+  },
+  "source": {
+    "run_git_commit": "7350909a0d74e917770b8bbc637bc90bbc6994c6",
+    "git_dirty_at_start": true,
+    "source_clean_at_start": true,
+    "source_id": "3c8643c7560429cdaeb215c62142a375a97fc764e0f9f2bf3d40c3c41ed84daa",
+    "analysis_sha256": "56fdce46364c7e6a3e3d1e7c6710fd4d8e839bc5c3a44419dfb3b4b732ad46c1",
+    "analysis_git_commit": "a19bb865b709bfc2bda3582774413323da81785a"
+  },
+  "independent_profile_total_energy_max_error_J_m2": 1.7053025658242404e-13,
+  "gas_storage_definition": "Eulerian total internal + kinetic energy; includes changing gas mass",
+  "gas_sensible_definition": "Integral rho cv (T-T0) dz; warming diagnostic, not the conserved storage",
+  "profile_integration": "All 32 phase samples per cycle, piecewise-linear time integral",
+  "envelope_definition": "Per-cycle exact sample minimum/maximum; not uncertainty bands",
+  "outlet_maximum_changes": {
+    "max_abs_temperature_change_K": 0.2555987376158555,
+    "max_abs_density_change_kg_m3": 0.000989320388370185,
+    "max_abs_velocity_m_s": 0.0034854150434868118,
+    "max_abs_pressure_change_Pa": 1.402949095441727
+  },
+  "limits": [
+    "One r4 grid and about 1 mm domain only",
+    "No finite-film radiation validation",
+    "Cold-reference linear normal-incidence outlet; warmed-background reflection not independently tested",
+    "Finite observation windows cannot establish infinite-time equilibrium"
+  ],
+  "last_window": {
+    "start_cycle": 90,
+    "end_cycle": 100,
+    "mid_time_ms": 4.75,
+    "film_temperature_K": 306.6215889995428,
+    "gas_energy_J_m2": 249.49478900523454,
+    "outlet_temperature_K": 300.216303325445,
+    "outlet_density_kg_m3": 1.1591700810275827,
+    "outlet_velocity_m_s": 0.0012494649163013532,
+    "outlet_pressure_Pa": 99767.96020084611,
+    "gas_energy_change_from_cold_J_m2": 0.00125820057388637,
+    "mean_gas_temperature_K": 302.0265892283735,
+    "max_mean_velocity_m_s": 0.0012494649191998567,
+    "gas_mass_kg_m2": 0.0011526111426782145,
+    "gas_sensible_excess_J_m2": 1.6648692204701188,
+    "input_W": 1.13,
+    "two_side_wall_W": 0.7852186315609598,
+    "leak_W": 0.3444550597562171,
+    "two_side_outlet_export_W": 0.7852957728345369,
+    "film_storage_rate_W": 0.0003263086827843995,
+    "two_side_gas_storage_rate_W": -7.714126850260071e-05,
+    "balance_residual_W": 5.035749595094785e-12
+  },
+  "outlet_last_window_relative_to_cold": {
+    "temperature_K": 0.21630332544498287,
+    "density_fraction": -0.0007154473900148339,
+    "velocity_m_s": 0.0012494649163013532,
+    "mach": 3.6007634475543318e-06,
+    "pressure_Pa": 0.5030579889717046
+  }
+}

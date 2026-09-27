@@ -1,0 +1,1013 @@
+{
+  "case_dir": "E:\\CNT_thermophone_LBM\\Compute\\lbm_acoustic_handoff\\20260924_time_convergence\\raw\\thermal_f50000_r4_h1mm_c20",
+  "status": "completed",
+  "validation_passed": true,
+  "public_gates": {
+    "pressure_amplitude": true,
+    "pressure_phase": true,
+    "cycle_stationarity": true,
+    "impermeable_wall": true,
+    "mass_audit": true,
+    "energy_audit": true,
+    "cumulative_mass_audit": true,
+    "cumulative_energy_audit": true,
+    "positive_populations": true
+  },
+  "git_commit": "5ff1bd8a5f08955fa1061b6730855aa1d1b71998",
+  "git_dirty": true,
+  "source_clean": false,
+  "frequency_Hz": 50000.0,
+  "probe_z_m": [
+    7.998484375e-05,
+    0.00011981403125,
+    0.00016029615625,
+    0.00030002478125,
+    0.00059972309375
+  ],
+  "windows": [
+    {
+      "cycles": [
+        4,
+        6
+      ],
+      "channels": {
+        "wall_flux_W_m2": {
+          "re": 219.6812096797877,
+          "im": -220.98603207008304,
+          "amplitude": 311.60016087360196,
+          "phase_deg": -45.169653176830494,
+          "sample_mean": 0.052082138562533534,
+          "trend_at_midpoint": 0.052082138562600425,
+          "drift_per_s": -1068.664948729668,
+          "residual_rms": 0.0021664038563599013,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0015484404020327247,
+            "phase_error_deg": -0.0008819321342335652,
+            "complex_relative_error": 2.183353320832055e-05,
+            "passed": true
+          }
+        },
+        "first_cell_temperature_K": {
+          "re": -0.0031801547073608658,
+          "im": -0.09666213608770513,
+          "amplitude": 0.09671443499809518,
+          "phase_deg": -91.884333953416,
+          "sample_mean": 299.9999994895476,
+          "trend_at_midpoint": 299.9999994895466,
+          "drift_per_s": 0.016166151676526273,
+          "residual_rms": 3.275637755482583e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": -0.00010635465859110127,
+            "phase_error_deg": -2.0227765347888737e-06,
+            "complex_relative_error": 1.0641323785860973e-06,
+            "passed": true
+          }
+        },
+        "pressure_Pa_0": {
+          "re": 0.23405012809979234,
+          "im": -0.2724381219164186,
+          "amplitude": 0.3591684740297714,
+          "phase_deg": -49.33430167315282,
+          "sample_mean": 101229.56648864564,
+          "trend_at_midpoint": 101229.56648864556,
+          "drift_per_s": -1.2382484329538097,
+          "residual_rms": 2.489382593576554e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0016652048734799862,
+            "phase_error_deg": -0.0008191376815742241,
+            "complex_relative_error": 2.194739892562815e-05,
+            "passed": true
+          }
+        },
+        "velocity_m_s_0": {
+          "re": 0.0005727047301438408,
+          "im": -0.0006661215238922347,
+          "amplitude": 0.0008784694602099964,
+          "phase_deg": -49.31237019188756,
+          "sample_mean": 1.9947502101440025e-07,
+          "trend_at_midpoint": 1.9947502101438627e-07,
+          "drift_per_s": -0.0048425779128585,
+          "residual_rms": 9.495552626821456e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.002661768072220738,
+            "phase_error_deg": -0.0013103810853853095,
+            "complex_relative_error": 3.509377425238183e-05,
+            "passed": true
+          }
+        },
+        "pressure_Pa_1": {
+          "re": 0.22403784024288395,
+          "im": -0.2806808486498501,
+          "amplitude": 0.3591304674620298,
+          "phase_deg": -51.40333374012065,
+          "sample_mean": 101229.56648817523,
+          "trend_at_midpoint": 101229.5664881753,
+          "drift_per_s": -1.2362069188308555,
+          "residual_rms": 2.527567214359907e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0017131086299082554,
+            "phase_error_deg": -0.0007829510679047095,
+            "complex_relative_error": 2.1913730048428514e-05,
+            "passed": true
+          }
+        },
+        "velocity_m_s_1": {
+          "re": 0.0005486487416643526,
+          "im": -0.0006873857818154808,
+          "amplitude": 0.0008794968190800677,
+          "phase_deg": -51.404282740830766,
+          "sample_mean": 1.978518455510244e-07,
+          "trend_at_midpoint": 1.9785184555113094e-07,
+          "drift_per_s": -0.0034054964218656284,
+          "residual_rms": 5.057854972849778e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0019270654799008469,
+            "phase_error_deg": -0.0008807276508490926,
+            "complex_relative_error": 2.4650531311780768e-05,
+            "passed": true
+          }
+        },
+        "pressure_Pa_2": {
+          "re": 0.21360168316486444,
+          "im": -0.2887035205628593,
+          "amplitude": 0.3591314548132096,
+          "phase_deg": -53.50355043094751,
+          "sample_mean": 101229.56648839569,
+          "trend_at_midpoint": 101229.56648839584,
+          "drift_per_s": -1.25245738207683,
+          "residual_rms": 2.566188359623819e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0017851868236107293,
+            "phase_error_deg": -0.0007562926304533682,
+            "complex_relative_error": 2.2201957972743483e-05,
+            "passed": true
+          }
+        },
+        "velocity_m_s_2": {
+          "re": 0.0005230928407941749,
+          "im": -0.0007069855146867663,
+          "amplitude": 0.0008794626985080333,
+          "phase_deg": -53.5025619841762,
+          "sample_mean": 1.6656736156323792e-07,
+          "trend_at_midpoint": 1.6656736156345566e-07,
+          "drift_per_s": -0.002774470596306654,
+          "residual_rms": 5.669037423472598e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0016148481885469579,
+            "phase_error_deg": -0.0006841451393141023,
+            "complex_relative_error": 2.0083658669476214e-05,
+            "passed": true
+          }
+        },
+        "pressure_Pa_3": {
+          "re": 0.1754634589859258,
+          "im": -0.3133492562603468,
+          "amplitude": 0.35913114852128625,
+          "phase_deg": -60.75286139177226,
+          "sample_mean": 101229.56648911518,
+          "trend_at_midpoint": 101229.566489115,
+          "drift_per_s": -1.2708559030282724,
+          "residual_rms": 2.607717196031363e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.001965964764449879,
+            "phase_error_deg": -0.0006302925498776852,
+            "complex_relative_error": 2.252818435855284e-05,
+            "passed": true
+          }
+        },
+        "velocity_m_s_3": {
+          "re": 0.00042972660611413703,
+          "im": -0.0007673196334886289,
+          "amplitude": 0.0008794568641721426,
+          "phase_deg": -60.74960415258983,
+          "sample_mean": 1.482759982408342e-07,
+          "trend_at_midpoint": 1.4827599824048945e-07,
+          "drift_per_s": -0.0031088007032919847,
+          "residual_rms": 6.393547656316952e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0019637790046989068,
+            "phase_error_deg": -0.0006296853807464412,
+            "complex_relative_error": 2.2503935153150444e-05,
+            "passed": true
+          }
+        },
+        "pressure_Pa_4": {
+          "re": 0.08504963459421082,
+          "im": -0.348920375689454,
+          "amplitude": 0.35913628181496576,
+          "phase_deg": -76.30123757495706,
+          "sample_mean": 101229.56649029335,
+          "trend_at_midpoint": 101229.56649029354,
+          "drift_per_s": -1.311311323261053,
+          "residual_rms": 2.724139285999377e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.002258540814081833,
+            "phase_error_deg": -0.0003150114686616719,
+            "complex_relative_error": 2.324498242760818e-05,
+            "passed": true
+          }
+        },
+        "velocity_m_s_4": {
+          "re": 0.00020837482548210926,
+          "im": -0.0008543849186439506,
+          "amplitude": 0.0008794280283803386,
+          "phase_deg": -76.29378209005397,
+          "sample_mean": 1.5112210927737242e-07,
+          "trend_at_midpoint": 1.5112210927783726e-07,
+          "drift_per_s": -0.00321065037150665,
+          "residual_rms": 6.669721032576925e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0022581736298654675,
+            "phase_error_deg": -0.00031514468207433007,
+            "complex_relative_error": 2.3241964914192343e-05,
+            "passed": true
+          }
+        }
+      }
+    },
+    {
+      "cycles": [
+        10,
+        12
+      ],
+      "channels": {
+        "wall_flux_W_m2": {
+          "re": 219.68041604953663,
+          "im": -220.98580055694495,
+          "amplitude": 311.59943716812353,
+          "phase_deg": -45.16972665778334,
+          "sample_mean": 0.011904394702756213,
+          "trend_at_midpoint": 0.011904394702639598,
+          "drift_per_s": -91.02859039212962,
+          "residual_rms": 6.762947514880423e-05,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00013189528460522126,
+            "phase_error_deg": -7.512388165242082e-05,
+            "complex_relative_error": 1.859778754374868e-06,
+            "passed": true
+          }
+        },
+        "first_cell_temperature_K": {
+          "re": -0.0031801426973080797,
+          "im": -0.09666213948639948,
+          "amplitude": 0.09671443800003902,
+          "phase_deg": -91.88432677603522,
+          "sample_mean": 300.0000000973635,
+          "trend_at_midpoint": 300.0000000973627,
+          "drift_per_s": 0.001377144903178494,
+          "residual_rms": 1.0219274018879916e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": -9.059527894539343e-06,
+            "phase_error_deg": -1.7250940887685864e-07,
+            "complex_relative_error": 9.064529676978719e-08,
+            "passed": true
+          }
+        },
+        "pressure_Pa_0": {
+          "re": 0.2340492175348118,
+          "im": -0.27243785770761203,
+          "amplitude": 0.3591676802566883,
+          "phase_deg": -49.33438438873475,
+          "sample_mean": 101229.56644182635,
+          "trend_at_midpoint": 101229.5664418262,
+          "drift_per_s": -0.10663503502286195,
+          "residual_rms": 7.924024004684723e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00014344423289180952,
+            "phase_error_deg": -7.054592674257386e-05,
+            "complex_relative_error": 1.8904033816576311e-06,
+            "passed": true
+          }
+        },
+        "velocity_m_s_0": {
+          "re": 0.000572701313723822,
+          "im": -0.0006661206230926052,
+          "amplitude": 0.0008784665498755614,
+          "phase_deg": -49.31250085365693,
+          "sample_mean": 2.646162585421975e-08,
+          "trend_at_midpoint": 2.646162585440414e-08,
+          "drift_per_s": -0.0003103129533684877,
+          "residual_rms": 2.8401135871602005e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00017056573669016473,
+            "phase_error_deg": -8.39715187487119e-05,
+            "complex_relative_error": 2.2488205639953583e-06,
+            "passed": true
+          }
+        },
+        "pressure_Pa_1": {
+          "re": 0.2240369130188881,
+          "im": -0.2806805754446381,
+          "amplitude": 0.3591296755031057,
+          "phase_deg": -51.40342216447868,
+          "sample_mean": 101229.56644177796,
+          "trend_at_midpoint": 101229.56644177763,
+          "drift_per_s": -0.10560183679607847,
+          "residual_rms": 7.80649998438431e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0001462794285922442,
+            "phase_error_deg": -6.686234118856527e-05,
+            "complex_relative_error": 1.8712518339728246e-06,
+            "passed": true
+          }
+        },
+        "velocity_m_s_1": {
+          "re": 0.0005486469658032418,
+          "im": -0.0006873853464598257,
+          "amplitude": 0.0008794953710013476,
+          "phase_deg": -51.40435546812743,
+          "sample_mean": 4.199373308503109e-08,
+          "trend_at_midpoint": 4.199373308463536e-08,
+          "drift_per_s": -0.000414312672828877,
+          "residual_rms": 3.1823196716569565e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00023444613455048113,
+            "phase_error_deg": -0.00010715113989247464,
+            "complex_relative_error": 2.998988416760897e-06,
+            "passed": true
+          }
+        },
+        "pressure_Pa_2": {
+          "re": 0.213600742383369,
+          "im": -0.28870324488289,
+          "amplitude": 0.3591306736448953,
+          "phase_deg": -53.5036449300125,
+          "sample_mean": 101229.56644170756,
+          "trend_at_midpoint": 101229.56644170763,
+          "drift_per_s": -0.10491185179617066,
+          "residual_rms": 7.784087305047679e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00014952376763410768,
+            "phase_error_deg": -6.335303430741062e-05,
+            "complex_relative_error": 1.859664521323265e-06,
+            "passed": true
+          }
+        },
+        "velocity_m_s_2": {
+          "re": 0.0005230907428008155,
+          "im": -0.0007069848215648757,
+          "amplitude": 0.0008794608934608907,
+          "phase_deg": -53.502645002082446,
+          "sample_mean": 4.730354205857431e-08,
+          "trend_at_midpoint": 4.7303542059022815e-08,
+          "drift_per_s": -0.00037454000526238653,
+          "residual_rms": 2.279998100133297e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00021799648179943176,
+            "phase_error_deg": -9.235755717931913e-05,
+            "complex_relative_error": 2.711201578136926e-06,
+            "passed": true
+          }
+        },
+        "pressure_Pa_3": {
+          "re": 0.17546250125062177,
+          "im": -0.3133489753618432,
+          "amplitude": 0.35913043550420715,
+          "phase_deg": -60.75297281517852,
+          "sample_mean": 101229.56644173356,
+          "trend_at_midpoint": 101229.5664417335,
+          "drift_per_s": -0.10619891467479847,
+          "residual_rms": 7.931034430298293e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00016424100779399708,
+            "phase_error_deg": -5.263501165683868e-05,
+            "complex_relative_error": 1.8818708486809777e-06,
+            "passed": true
+          }
+        },
+        "velocity_m_s_3": {
+          "re": 0.00042972425695226506,
+          "im": -0.0007673189465570112,
+          "amplitude": 0.0008794551169664872,
+          "phase_deg": -60.74971581651855,
+          "sample_mean": 3.4190174596152263e-08,
+          "trend_at_midpoint": 3.419017459627351e-08,
+          "drift_per_s": -0.00023669751757435858,
+          "residual_rms": 1.9028976011674658e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00014951802018714488,
+            "phase_error_deg": -4.79437125536032e-05,
+            "complex_relative_error": 1.7134054843970585e-06,
+            "passed": true
+          }
+        },
+        "pressure_Pa_4": {
+          "re": 0.08504863166334617,
+          "im": -0.34892007912043527,
+          "amplitude": 0.35913575617197785,
+          "phase_deg": -76.30138182423411,
+          "sample_mean": 101229.56644184196,
+          "trend_at_midpoint": 101229.56644184208,
+          "drift_per_s": -0.10730190074585723,
+          "residual_rms": 8.045073404961063e-08,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.0001847911774932598,
+            "phase_error_deg": -2.5813716500880984e-05,
+            "complex_relative_error": 1.9020408771621214e-06,
+            "passed": true
+          }
+        },
+        "velocity_m_s_4": {
+          "re": 0.0002083723698911354,
+          "im": -0.0008543841921637147,
+          "amplitude": 0.0008794267407540502,
+          "phase_deg": -76.29392630432498,
+          "sample_mean": 3.249235369105961e-08,
+          "trend_at_midpoint": 3.249235369076673e-08,
+          "drift_per_s": -0.0002627440939363258,
+          "residual_rms": 1.9697811008688075e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 0.00018479827523787407,
+            "phase_error_deg": -2.579022220173368e-05,
+            "complex_relative_error": 1.9020127513181894e-06,
+            "passed": true
+          }
+        }
+      }
+    },
+    {
+      "cycles": [
+        18,
+        20
+      ],
+      "channels": {
+        "wall_flux_W_m2": {
+          "re": 219.68039497643886,
+          "im": -220.98579797688296,
+          "amplitude": 311.599420481624,
+          "phase_deg": -45.16972907135209,
+          "sample_mean": 0.004868741568998303,
+          "trend_at_midpoint": 0.004868741569049401,
+          "drift_per_s": -20.299467876387403,
+          "residual_rms": 8.25169231455342e-06,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 2.9412770263803623e-05,
+            "phase_error_deg": -1.675271908041912e-05,
+            "complex_relative_error": 4.147325704440418e-07,
+            "passed": true
+          }
+        },
+        "first_cell_temperature_K": {
+          "re": -0.0031801423772845998,
+          "im": -0.09666213950845871,
+          "amplitude": 0.09671443801156338,
+          "phase_deg": -91.884326586119,
+          "sample_mean": 300.000000203809,
+          "trend_at_midpoint": 300.0000002038085,
+          "drift_per_s": 0.0003071355753520087,
+          "residual_rms": 1.2456698891057154e-10,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": -2.0202177153372247e-06,
+            "phase_error_deg": -3.844195073591899e-08,
+            "complex_relative_error": 2.021331575460695e-08,
+            "passed": true
+          }
+        },
+        "pressure_Pa_0": {
+          "re": 0.23404919262089954,
+          "im": -0.27243785523804437,
+          "amplitude": 0.3591676621484743,
+          "phase_deg": -49.33438714667125,
+          "sample_mean": 101229.56643359199,
+          "trend_at_midpoint": 101229.56643359199,
+          "drift_per_s": -0.023723647534563845,
+          "residual_rms": 9.660446403662144e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 3.188264980913402e-05,
+            "phase_error_deg": -1.5701865500235074e-05,
+            "complex_relative_error": 4.2042044692825666e-07,
+            "passed": true
+          }
+        },
+        "velocity_m_s_0": {
+          "re": 0.0005727012203928949,
+          "im": -0.0006661206110062587,
+          "amplitude": 0.0008784664798652608,
+          "phase_deg": -49.3125049555762,
+          "sample_mean": 5.954589197093376e-09,
+          "trend_at_midpoint": 5.954589197064896e-09,
+          "drift_per_s": -4.595897913119706e-05,
+          "residual_rms": 2.4370661099665925e-11,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 2.52616723761534e-05,
+            "phase_error_deg": -1.2436641479976254e-05,
+            "complex_relative_error": 3.3306217568224194e-07,
+            "passed": true
+          }
+        },
+        "pressure_Pa_1": {
+          "re": 0.22403688887673537,
+          "im": -0.2806805724332159,
+          "amplitude": 0.35912965808883623,
+          "phase_deg": -51.40342487505231,
+          "sample_mean": 101229.56643359753,
+          "trend_at_midpoint": 101229.56643359752,
+          "drift_per_s": -0.02365175671906321,
+          "residual_rms": 9.60580399839751e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 3.2749013811894656e-05,
+            "phase_error_deg": -1.4996196404289764e-05,
+            "complex_relative_error": 4.1923022017183946e-07,
+            "passed": true
+          }
+        },
+        "velocity_m_s_1": {
+          "re": 0.0005486468660066843,
+          "im": -0.0006873853353289931,
+          "amplitude": 0.0008794953000467421,
+          "phase_deg": -51.40436009703535,
+          "sample_mean": 1.1691668420013799e-08,
+          "trend_at_midpoint": 1.1691668419988277e-08,
+          "drift_per_s": -7.720295283561513e-05,
+          "residual_rms": 3.73901402268177e-11,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 4.3686632889006205e-05,
+            "phase_error_deg": -1.9966562736543973e-05,
+            "complex_relative_error": 5.588310369346244e-07,
+            "passed": true
+          }
+        },
+        "pressure_Pa_2": {
+          "re": 0.2136007184001237,
+          "im": -0.2887032417041676,
+          "amplitude": 0.35913065682498335,
+          "phase_deg": -53.503647704319356,
+          "sample_mean": 101229.56643358356,
+          "trend_at_midpoint": 101229.56643358344,
+          "drift_per_s": -0.023506292215621588,
+          "residual_rms": 9.530102728199434e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 3.353719757459572e-05,
+            "phase_error_deg": -1.4215600864273491e-05,
+            "complex_relative_error": 4.171720011551695e-07,
+            "passed": true
+          }
+        },
+        "velocity_m_s_2": {
+          "re": 0.0005230906762116642,
+          "im": -0.0007069848153367197,
+          "amplitude": 0.0008794608488479017,
+          "phase_deg": -53.502648248155424,
+          "sample_mean": 1.6246158620896693e-08,
+          "trend_at_midpoint": 1.624615862100797e-08,
+          "drift_per_s": -9.242412581519604e-05,
+          "residual_rms": 3.9109058368884555e-11,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 5.3794325372003016e-05,
+            "phase_error_deg": -2.2790837081303914e-05,
+            "complex_relative_error": 6.690351982264036e-07,
+            "passed": true
+          }
+        },
+        "pressure_Pa_3": {
+          "re": 0.17546247663313264,
+          "im": -0.3133489721163499,
+          "amplitude": 0.3591304206449318,
+          "phase_deg": -60.752975989012086,
+          "sample_mean": 101229.56643355412,
+          "trend_at_midpoint": 101229.5664335541,
+          "drift_per_s": -0.023475192465597434,
+          "residual_rms": 9.601168318959957e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 3.636623013836271e-05,
+            "phase_error_deg": -1.1672199292732871e-05,
+            "complex_relative_error": 4.168350199717415e-07,
+            "passed": true
+          }
+        },
+        "velocity_m_s_3": {
+          "re": 0.0004297241957426102,
+          "im": -0.0007673189385432224,
+          "amplitude": 0.0008794550800659069,
+          "phase_deg": -60.74971904070528,
+          "sample_mean": 1.608622070567841e-08,
+          "trend_at_midpoint": 1.6086220705598155e-08,
+          "drift_per_s": -5.630567327280113e-05,
+          "residual_rms": 1.8069546768578154e-11,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 3.556738599197473e-05,
+            "phase_error_deg": -1.140487645199029e-05,
+            "complex_relative_error": 4.0758540742453564e-07,
+            "passed": true
+          }
+        },
+        "pressure_Pa_4": {
+          "re": 0.08504860630217682,
+          "im": -0.3489200761631114,
+          "amplitude": 0.3591357472928783,
+          "phase_deg": -76.30138564348141,
+          "sample_mean": 101229.56643358742,
+          "trend_at_midpoint": 101229.56643358745,
+          "drift_per_s": -0.02367700682607398,
+          "residual_rms": 9.681909176326573e-09,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 4.073770372148289e-05,
+            "phase_error_deg": -5.674449196844648e-06,
+            "complex_relative_error": 4.1924282294732065e-07,
+            "passed": true
+          }
+        },
+        "velocity_m_s_4": {
+          "re": 0.0002083723082126477,
+          "im": -0.0008543841846256976,
+          "amplitude": 0.0008794267188165166,
+          "phase_deg": -76.29393009196426,
+          "sample_mean": 1.2286013962888626e-08,
+          "trend_at_midpoint": 1.2286013963169568e-08,
+          "drift_per_s": -5.7901533477547084e-05,
+          "residual_rms": 2.381657806217347e-11,
+          "n_samples": 21504,
+          "detrend_sensitivity": {
+            "amplitude_error_percent": 4.072443031688522e-05,
+            "phase_error_deg": -5.683458620041682e-06,
+            "complex_relative_error": 4.1915103173117967e-07,
+            "passed": true
+          }
+        }
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "candidate_cycles": [
+        4,
+        6
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "channels": {
+        "wall_flux_W_m2": {
+          "amplitude_error_percent": 0.0002376101909451478,
+          "phase_error_deg": 7.589452159426034e-05,
+          "complex_relative_error": 2.7203775866330504e-06,
+          "passed": true
+        },
+        "first_cell_temperature_K": {
+          "amplitude_error_percent": -3.1158410851439555e-06,
+          "phase_error_deg": -7.367296990732121e-06,
+          "complex_relative_error": 1.3230489613323268e-07,
+          "passed": true
+        },
+        "pressure_Pa_0": {
+          "amplitude_error_percent": 0.0002260452102831323,
+          "phase_error_deg": 8.547351842758877e-05,
+          "complex_relative_error": 2.7083387957680672e-06,
+          "passed": true
+        },
+        "velocity_m_s_0": {
+          "amplitude_error_percent": 0.00033926675677697915,
+          "phase_error_deg": 0.00013476368864083163,
+          "complex_relative_error": 4.128249708151015e-06,
+          "passed": true
+        },
+        "pressure_Pa_1": {
+          "amplitude_error_percent": 0.00022537074713113725,
+          "phase_error_deg": 9.113493166213036e-05,
+          "complex_relative_error": 2.7584825770535534e-06,
+          "passed": true
+        },
+        "velocity_m_s_1": {
+          "amplitude_error_percent": 0.00017271648018457597,
+          "phase_error_deg": 7.735620459000566e-05,
+          "complex_relative_error": 2.1922423855049255e-06,
+          "passed": true
+        },
+        "pressure_Pa_2": {
+          "amplitude_error_percent": 0.00022219997404260283,
+          "phase_error_deg": 9.727337184364145e-05,
+          "complex_relative_error": 2.7963569945674927e-06,
+          "passed": true
+        },
+        "velocity_m_s_2": {
+          "amplitude_error_percent": 0.00021031750692124263,
+          "phase_error_deg": 8.626397923374538e-05,
+          "complex_relative_error": 2.586532965843308e-06,
+          "passed": true
+        },
+        "pressure_Pa_3": {
+          "amplitude_error_percent": 0.00020267744325064285,
+          "phase_error_deg": 0.00011459723983324532,
+          "complex_relative_error": 2.8474935141704737e-06,
+          "passed": true
+        },
+        "velocity_m_s_3": {
+          "amplitude_error_percent": 0.00020286496447141644,
+          "phase_error_deg": 0.0001148881154506432,
+          "complex_relative_error": 2.852395111385432e-06,
+          "passed": true
+        },
+        "pressure_Pa_4": {
+          "amplitude_error_percent": 0.00014883566772372347,
+          "phase_error_deg": 0.0001480685243489724,
+          "complex_relative_error": 2.9822366690354584e-06,
+          "passed": true
+        },
+        "velocity_m_s_4": {
+          "amplitude_error_percent": 0.00014891107966708006,
+          "phase_error_deg": 0.00014800191028469534,
+          "complex_relative_error": 2.981605793743322e-06,
+          "passed": true
+        }
+      },
+      "passed": true
+    },
+    {
+      "candidate_cycles": [
+        10,
+        12
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "channels": {
+        "wall_flux_W_m2": {
+          "amplitude_error_percent": 5.355112508986792e-06,
+          "phase_error_deg": 2.413568745657685e-06,
+          "complex_relative_error": 6.813380395122964e-08,
+          "passed": true
+        },
+        "first_cell_temperature_K": {
+          "amplitude_error_percent": -1.1915857189848111e-08,
+          "phase_error_deg": -1.899162027428021e-07,
+          "complex_relative_error": 3.316804164069844e-09,
+          "passed": true
+        },
+        "pressure_Pa_0": {
+          "amplitude_error_percent": 5.0417161556737256e-06,
+          "phase_error_deg": 2.7579364989173226e-06,
+          "complex_relative_error": 6.970563465407692e-08,
+          "passed": true
+        },
+        "velocity_m_s_0": {
+          "amplitude_error_percent": 7.969604109980821e-06,
+          "phase_error_deg": 4.101919280692179e-06,
+          "complex_relative_error": 1.0713017039035631e-07,
+          "passed": true
+        },
+        "pressure_Pa_1": {
+          "amplitude_error_percent": 4.849020140973437e-06,
+          "phase_error_deg": 2.710573631861052e-06,
+          "complex_relative_error": 6.774501986407286e-08,
+          "passed": true
+        },
+        "velocity_m_s_1": {
+          "amplitude_error_percent": 8.067650325571663e-06,
+          "phase_error_deg": 4.628907926620197e-06,
+          "complex_relative_error": 1.1417386646988982e-07,
+          "passed": true
+        },
+        "pressure_Pa_2": {
+          "amplitude_error_percent": 4.68350769278203e-06,
+          "phase_error_deg": 2.774306862424265e-06,
+          "complex_relative_error": 6.736540190760825e-08,
+          "passed": true
+        },
+        "velocity_m_s_2": {
+          "amplitude_error_percent": 5.072765785207878e-06,
+          "phase_error_deg": 3.246072986160955e-06,
+          "complex_relative_error": 7.604634175222379e-08,
+          "passed": true
+        },
+        "pressure_Pa_3": {
+          "amplitude_error_percent": 4.137570774886967e-06,
+          "phase_error_deg": 3.173833554937973e-06,
+          "complex_relative_error": 6.914063515825407e-08,
+          "passed": true
+        },
+        "velocity_m_s_3": {
+          "amplitude_error_percent": 4.195845937360332e-06,
+          "phase_error_deg": 3.224186724943063e-06,
+          "complex_relative_error": 7.01934918134866e-08,
+          "passed": true
+        },
+        "pressure_Pa_4": {
+          "amplitude_error_percent": 2.4723519231883984e-06,
+          "phase_error_deg": 3.819247303468095e-06,
+          "complex_relative_error": 7.109571154288836e-08,
+          "passed": true
+        },
+        "velocity_m_s_4": {
+          "amplitude_error_percent": 2.4945266297038415e-06,
+          "phase_error_deg": 3.787639272744953e-06,
+          "complex_relative_error": 7.06567212986149e-08,
+          "passed": true
+        }
+      },
+      "passed": true
+    }
+  ],
+  "profile_comparisons": [
+    {
+      "field": "temperature_K",
+      "cycles": [
+        4,
+        6
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 5.7854343594954116e-05,
+      "max_raw_same_phase_difference": 6.834041670344959e-05,
+      "max_mean_removed_same_phase_difference": 1.147991554262262e-05,
+      "max_adjacent_cycle_difference": 2.762690968438619e-05,
+      "reference_max_phase_deviation": 0.09670204200511989,
+      "raw_difference_percent_of_reference_phase_deviation": 0.07067112057450793
+    },
+    {
+      "field": "temperature_K",
+      "cycles": [
+        10,
+        12
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 1.2937563894865889e-05,
+      "max_raw_same_phase_difference": 1.3996590382703289e-05,
+      "max_mean_removed_same_phase_difference": 1.117057138344535e-06,
+      "max_adjacent_cycle_difference": 3.2783522101453855e-06,
+      "reference_max_phase_deviation": 0.09670204200511989,
+      "raw_difference_percent_of_reference_phase_deviation": 0.014473934668269196
+    },
+    {
+      "field": "temperature_K",
+      "cycles": [
+        18,
+        20
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 0.0,
+      "max_raw_same_phase_difference": 0.0,
+      "max_mean_removed_same_phase_difference": 0.0,
+      "max_adjacent_cycle_difference": 9.439739301342343e-07,
+      "reference_max_phase_deviation": 0.09670204200511989,
+      "raw_difference_percent_of_reference_phase_deviation": 0.0
+    },
+    {
+      "field": "pressure_Pa",
+      "cycles": [
+        4,
+        6
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 5.842247628606856e-05,
+      "max_raw_same_phase_difference": 7.437521708197892e-05,
+      "max_mean_removed_same_phase_difference": 1.595274079591036e-05,
+      "max_adjacent_cycle_difference": 3.9080739952623844e-05,
+      "reference_max_phase_deviation": 0.4077597027498996,
+      "raw_difference_percent_of_reference_phase_deviation": 0.018239962551571003
+    },
+    {
+      "field": "pressure_Pa",
+      "cycles": [
+        10,
+        12
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 8.68749339133501e-06,
+      "max_raw_same_phase_difference": 9.605428203940392e-06,
+      "max_mean_removed_same_phase_difference": 9.17934812605381e-07,
+      "max_adjacent_cycle_difference": 2.5489862309768796e-06,
+      "reference_max_phase_deviation": 0.4077597027498996,
+      "raw_difference_percent_of_reference_phase_deviation": 0.002355659016612513
+    },
+    {
+      "field": "pressure_Pa",
+      "cycles": [
+        18,
+        20
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 0.0,
+      "max_raw_same_phase_difference": 0.0,
+      "max_mean_removed_same_phase_difference": 0.0,
+      "max_adjacent_cycle_difference": 5.375331966206431e-07,
+      "reference_max_phase_deviation": 0.4077597027498996,
+      "raw_difference_percent_of_reference_phase_deviation": 0.0
+    },
+    {
+      "field": "velocity_m_s",
+      "cycles": [
+        4,
+        6
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 2.0115206482937447e-07,
+      "max_raw_same_phase_difference": 2.525536324966826e-07,
+      "max_mean_removed_same_phase_difference": 5.667949109841174e-08,
+      "max_adjacent_cycle_difference": 1.3808364908570944e-07,
+      "reference_max_phase_deviation": 0.0009390560847999357,
+      "raw_difference_percent_of_reference_phase_deviation": 0.02689441414465556
+    },
+    {
+      "field": "velocity_m_s",
+      "cycles": [
+        10,
+        12
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 3.1811017624897605e-08,
+      "max_raw_same_phase_difference": 3.51376534614466e-08,
+      "max_mean_removed_same_phase_difference": 3.5383568222757187e-09,
+      "max_adjacent_cycle_difference": 9.453311854883475e-09,
+      "reference_max_phase_deviation": 0.0009390560847999357,
+      "raw_difference_percent_of_reference_phase_deviation": 0.0037418056312294294
+    },
+    {
+      "field": "velocity_m_s",
+      "cycles": [
+        18,
+        20
+      ],
+      "reference_cycles": [
+        18,
+        20
+      ],
+      "max_mean_difference": 0.0,
+      "max_raw_same_phase_difference": 0.0,
+      "max_mean_removed_same_phase_difference": 0.0,
+      "max_adjacent_cycle_difference": 1.9975353726794584e-09,
+      "reference_max_phase_deviation": 0.0009390560847999357,
+      "raw_difference_percent_of_reference_phase_deviation": 0.0
+    }
+  ],
+  "profile_sampling": {
+    "native_samples_in_windows": [
+      259,
+      259,
+      259
+    ],
+    "common_samples_per_cycle": 128,
+    "interpolation": "cubic spline on recorded timestamps; no extrapolation",
+    "phases": "0, 1/N, ..., (N-1)/N"
+  },
+  "limits": {
+    "amplitude_percent": 0.1,
+    "phase_deg": 0.1
+  },
+  "harmonic_time_convergence_passed": true,
+  "detrend_sensitivity_passed": true,
+  "time_convergence_passed": true,
+  "full_field_periodic_steady_state_established": null,
+  "scope": "Finite-window harmonic convergence; profile means and raw waveforms reported separately. No claim of infinite-time equilibrium, short-domain accuracy, or finite-film radiation.",
+  "sampling": "Pressure/normal velocity/temperature at step end; actual wall exchange at interval midpoint. Profile means use a common interpolated phase grid; no energy integral is inferred.",
+  "phase_convention": "exp(+i omega t), shared original time axis; no phase or gain correction"
+}

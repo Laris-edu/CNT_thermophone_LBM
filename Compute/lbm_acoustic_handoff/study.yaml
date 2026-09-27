@@ -1,0 +1,24 @@
+base_config: gas.yaml
+defaults:
+  mode: thermal
+  frequency_Hz: 50000.0
+  amplitude_K: 0.1
+  refine: 4
+  length_m: 0.001
+  cycles: 20
+  ramp_cycles: 2
+  probes_m: [0.00008, 0.00012, 0.00016, 0.00030, 0.00060]
+  sampling:
+    profile_cycles: 20
+    profile_samples_per_cycle: 128
+cases:
+  - name: thermal_f50000_r4_h1mm_c20
+
+# Time-convergence preflight for a future short-LBM / acoustic handoff.
+# One cold-start trajectory; compare cycle windows [4,6), [10,12), [18,20).
+# Relative to [18,20): harmonic amplitude <=0.1%, phase <=0.1 deg.
+# Also check constant/linear detrend sensitivity with the same limits.
+# Report phase-sampled profile means and raw same-phase waveform differences
+# separately; harmonic convergence does not establish full-field equilibrium.
+# Existing public numerical/analytical gates are unchanged. No short-domain
+# scan, finite-film radiation, or power-driven cold-start validation here.

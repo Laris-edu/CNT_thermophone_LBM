@@ -1,0 +1,10 @@
+# Same air and mapping as the existing 50 kHz prescribed-temperature cases.
+include: ../../configs/gas_air_10k_d2q37_qmatched_local_transport.yaml
+numerics:
+  precision: float64
+  streaming: pull
+  boundary: periodic
+  nx: 128
+  ny: 4
+  steps: 400
+  collision_backend: numba
