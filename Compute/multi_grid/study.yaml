@@ -1,0 +1,64 @@
+base_config: ../open_planar/e1_long_air.yaml
+defaults:
+  refine: 4
+  length_m: 0.00100030025
+  frequency_Hz: 20000.0
+  probes_m: [0.00012, 0.0003, 0.0006]
+  sampling:
+    probe_interpolation: linear
+    sync_fine_steps: 2
+    profile_samples_per_cycle: 32
+cases:
+  - name: pulse_up_two_level
+    mode: interface_pulse
+    grid: {type: two_level, ratio: 2, interface_m: 0.000500150125}
+    probes_m: [0.00037511259375, 0.0006248611875]
+    interface_pulse: {direction: 1, epsilon: 0.00001, center_fraction: 0.25, width_fraction: 0.025, interface_m: 0.000500150125, sync_steps: 388}
+  - name: pulse_up_uniform
+    mode: interface_pulse
+    probes_m: [0.00037511259375, 0.0006248611875]
+    interface_pulse: {direction: 1, epsilon: 0.00001, center_fraction: 0.25, width_fraction: 0.025, interface_m: 0.000500150125, sync_steps: 388}
+  - name: pulse_down_two_level
+    mode: interface_pulse
+    grid: {type: two_level, ratio: 2, interface_m: 0.000500150125}
+    probes_m: [0.00037511259375, 0.0006248611875]
+    interface_pulse: {direction: -1, epsilon: 0.00001, center_fraction: 0.75, width_fraction: 0.025, interface_m: 0.000500150125, sync_steps: 388}
+  - name: pulse_down_uniform
+    mode: interface_pulse
+    probes_m: [0.00037511259375, 0.0006248611875]
+    interface_pulse: {direction: -1, epsilon: 0.00001, center_fraction: 0.75, width_fraction: 0.025, interface_m: 0.000500150125, sync_steps: 388}
+  - name: step_two_level
+    mode: thermal_step
+    amplitude_K: 0.1
+    grid: {type: two_level, ratio: 2, interface_m: 0.000020894}
+    thermal_step: {duration_s: 0.000005, interface_m: 0.000020894}
+  - name: step_uniform
+    mode: thermal_step
+    amplitude_K: 0.1
+    thermal_step: {duration_s: 0.000005, interface_m: 0.000020894}
+  - name: thermal_two_level
+    mode: thermal
+    amplitude_K: 0.1
+    cycles: 6.0
+    ramp_cycles: 2.0
+    grid: {type: two_level, ratio: 2, interface_m: 0.000125364}
+    analysis: {window_cycles: 2.0}
+  - name: thermal_uniform
+    mode: thermal
+    amplitude_K: 0.1
+    cycles: 6.0
+    ramp_cycles: 2.0
+    analysis: {window_cycles: 2.0}
+  - name: power_two_level
+    mode: power
+    cycles: 20.0
+    grid: {type: two_level, ratio: 2, interface_m: 0.000125364}
+    power: {mean_W: 1.13, area_m2: 0.0009}
+    film: {C_A_J_m2K: 0.0007, G_W_m2K: 57.8, T_ref_K: 300.0, initial_temperature_K: 300.0, gas_flux_factor: 2.0}
+    stopping: {stop_when_stable: false}
+  - name: power_uniform
+    mode: power
+    cycles: 20.0
+    power: {mean_W: 1.13, area_m2: 0.0009}
+    film: {C_A_J_m2K: 0.0007, G_W_m2K: 57.8, T_ref_K: 300.0, initial_temperature_K: 300.0, gas_flux_factor: 2.0}
+    stopping: {stop_when_stable: false}

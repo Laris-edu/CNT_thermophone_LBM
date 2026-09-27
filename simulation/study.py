@@ -63,7 +63,43 @@ def _finite(value, name, *, minimum=0., strict=True):
         raise ValueError(f'{name} must be finite and {">" if strict else ">="} {minimum}')
 
 
+def synchronized_run(run):
+    return run['sampling'].get('sync_fine_steps',1)==2
+
+
 def validate_run(run):
+    # Optional observations do not alter the legacy defaults or schema.
+    run=deepcopy(run)
+    sampling=run.get('sampling',{})
+    interpolation=sampling.pop('probe_interpolation','nearest')
+    cadence=sampling.pop('sync_fine_steps',1)
+    if interpolation not in ('nearest','linear') or type(cadence) is not int or cadence not in (1,2):
+        raise ValueError('sampling requires nearest/linear and sync_fine_steps 1 or 2')
+    if interpolation=='linear' and cadence!=2:
+        raise ValueError('linear observation currently requires synchronized sampling')
+    mode=run.get('mode')
+    if mode=='pulse' and cadence!=1:
+        raise ValueError('legacy outlet pulse requires sync_fine_steps=1; use interface_pulse for interface experiments')
+    if mode in ('interface_pulse','thermal_step'):
+        if cadence!=2:
+            raise ValueError('interface experiments require sync_fine_steps=2')
+        experiment=run.pop(mode,None)
+        expected=({'direction','epsilon','center_fraction','width_fraction','interface_m','sync_steps'}
+                  if mode=='interface_pulse' else {'duration_s','interface_m'})
+        if not isinstance(experiment,dict) or set(experiment)!=expected:
+            raise ValueError(f'unknown/missing {mode} parameters')
+        for key,value in experiment.items():
+            if key!='direction':
+                _finite(value,key)
+        if mode=='interface_pulse':
+            if (experiment['direction'] not in (-1,1) or isinstance(experiment['direction'],bool)
+                or type(experiment['sync_steps']) is not int or experiment['epsilon']>=.01
+                or not 0<experiment['center_fraction']<1 or experiment['width_fraction']>=1
+                or len(run['probes_m'])!=2):
+                raise ValueError('invalid directional interface pulse')
+        # Share parameter checks, without applying a periodic-fit duration to a transient.
+        run['mode']='thermal'
+        run['cycles']=max(run['cycles'],run['ramp_cycles']+2*run['analysis']['window_cycles'])
     if run.get('mode') == 'power':
         return _validate_power_run(run)
     if set(run) != set(DEFAULTS):
@@ -154,7 +190,15 @@ def validate_effective(config):
     if nx != 1 or not isinstance(ny,int) or ny < 8 or config['numerics']['boundary'] != 'planar_open_y':
         raise ValueError('open planar cases require nx=1, ny>=8, planar_open_y')
     z=(np.arange(ny)+.5)*mapping.lattice.dx_m
-    if run['mode'] in ('thermal','power'):
+    if 'grid' in config:
+        from core.two_level_planar_solver import TwoLevelPlanarOpenSolver
+        solver=TwoLevelPlanarOpenSolver(config)
+        z=solver.z_m
+        if not synchronized_run(run):
+            raise ValueError('two_level requires sync_fine_steps=2')
+        if run['mode']=='pulse':
+            raise ValueError('use the independent interface_pulse experiment for two_level')
+    if run['mode'] in ('thermal','power','thermal_step','interface_pulse'):
         probes=run['probes_m']
         if min(probes)<z[0] or max(probes)>=z[-1]:
             raise ValueError('domain must contain all requested probes')
@@ -163,7 +207,19 @@ def validate_effective(config):
         samples=run['analysis']['window_cycles'] / (run['frequency_Hz']*mapping.lattice.dt_s)
         if samples < 2*run['analysis']['harmonics']+run['analysis']['detrend_order']+3:
             raise ValueError('analysis window has too few samples')
-        steps=int(np.ceil(run['cycles']/run['frequency_Hz']/mapping.lattice.dt_s))
+        steps=planned_fine_steps(config)
+        if run['mode'] in ('thermal_step','interface_pulse'):
+            interface=run[run['mode']]['interface_m']
+            index=interface/mapping.lattice.dx_m
+            if not np.isclose(index,round(index),atol=1e-9,rtol=0) or not 3<=round(index)<=ny-3:
+                raise ValueError('diagnostic interface must be an interior cell face')
+            if 'grid' in config and not np.isclose(interface,config['grid']['interface_m'],rtol=0,atol=1e-15):
+                raise ValueError('experiment and grid interface must match')
+            if run['mode']=='interface_pulse':
+                p=run['interface_pulse']; source=p['center_fraction']*ny*mapping.lattice.dx_m
+                if not (run['probes_m'][0]<interface<run['probes_m'][1]
+                        and (source<run['probes_m'][0] if p['direction']==1 else source>run['probes_m'][1])):
+                    raise ValueError('pulse source and probes must bracket the interface in propagation order')
     else:
         p=run['pulse']; H=ny*mapping.lattice.dx_m
         probe=z[np.argmin(abs(z-p['probe_fraction']*H))]/H
@@ -183,14 +239,49 @@ def validate_effective(config):
                 raise ValueError('pulse analysis windows contain no discrete samples')
     if config['numerics']['steps'] != steps:
         raise ValueError('effective steps do not match the requested run')
+    if 'grid_layout' in config and config['grid_layout']!=resolved_layout(config):
+        raise ValueError('effective grid layout does not match requested grid')
     return config
+
+
+def planned_fine_steps(config):
+    run=config['run']; mapping=create_unit_mapping(config); dt=mapping.lattice.dt_s
+    mode=run['mode']
+    if mode=='interface_pulse':
+        return 2*run['interface_pulse']['sync_steps']
+    if mode=='thermal_step':
+        seconds=run['thermal_step']['duration_s']
+    elif mode in ('thermal','power'):
+        seconds=run['cycles']/run['frequency_Hz']
+    else:
+        seconds=run['pulse']['duration_crossings']*config['numerics']['ny']*mapping.lattice.dx_m/mapping.physical.c0_m_s
+    stride=2 if synchronized_run(run) else 1
+    return stride*int(np.ceil(seconds/(stride*dt)))
+
+
+def resolved_layout(config):
+    steps=planned_fine_steps(config)
+    if 'grid' in config:
+        from core.two_level_planar_solver import two_level_layout
+        layout=two_level_layout(config)
+        layout.update(sync_steps=steps//2,cell_updates=(steps//2)*(2*layout['fine_cells']+layout['coarse_cells']))
+    else:
+        ny=config['numerics']['ny']; dx=config['lattice']['dx_m']
+        layout=dict(fine_cells=ny,coarse_cells=0,shadow_cells=0,actual_length_m=ny*dx,
+            sync_steps=steps//(2 if synchronized_run(config['run']) else 1),cell_updates=steps*ny)
+    return layout
 
 
 def prepare_case(parameters, base_config=BASE):
     parameters=deepcopy(parameters)
     name=valid_name(parameters.pop('name','case'))
+    grid=parameters.pop('grid',None)
     defaults=POWER_DEFAULTS if parameters.get('mode')=='power' else DEFAULTS
     run=merge(defaults,parameters)
+    if grid is not None:
+        if run['sampling'].get('sync_fine_steps',2)!=2:
+            raise ValueError('two_level requires sync_fine_steps=2')
+        run['sampling']['sync_fine_steps']=2
     validate_run(run)
     config=deepcopy(base_config) if isinstance(base_config,dict) else load_config(Path(base_config))
     config['lattice']['dx_m'] /= run['refine']
@@ -199,10 +290,16 @@ def prepare_case(parameters, base_config=BASE):
     config['numerics'].update(nx=1,ny=ny,boundary='planar_open_y')
     config['case'].update(name=name,purpose='single-sided open planar '+run['mode'])
     config['run']=run
+    if grid is not None:
+        config['grid']=grid
     mapping=create_unit_mapping(config)
-    seconds=(run['cycles']/run['frequency_Hz'] if run['mode'] in ('thermal','power') else
-        run['pulse']['duration_crossings']*ny*mapping.lattice.dx_m/mapping.physical.c0_m_s)
-    config['numerics']['steps']=int(np.ceil(seconds/mapping.lattice.dt_s))
+    config['numerics']['steps']=planned_fine_steps(config)
+    if synchronized_run(run):
+        config['grid_layout']=resolved_layout(config)
+        if grid is not None:
+            from core.two_level_planar_solver import TwoLevelPlanarOpenSolver
+            solver=TwoLevelPlanarOpenSolver(config)
+            config['level_mappings']=dict(fine=solver.mapping.to_metadata(),coarse=solver.coarse_mapping.to_metadata())
     return validate_effective(config)
 
 

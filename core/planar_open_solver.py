@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from boundary.planar_open import PreparedDiffuseWall, characteristic_top, crossing_totals
+from boundary.planar_open import PreparedDiffuseWall, characteristic_top, crossing_totals, crossing_moments
 from core.collision_smrt import collide_fg
 from core.solver import GasSolver2D
 from core.streaming import pull_stream_open_y
@@ -28,6 +28,8 @@ class PlanarOpenSolver(GasSolver2D):
         if self.nx != 1 or self.ny < 8:
             raise ValueError("planar open validation requires nx=1 and ny>=8")
         self.last_audit = None
+        self.interface_face_index = None
+        self.last_interface_audit = None
 
     @property
     def z_m(self):
@@ -76,11 +78,25 @@ class PlanarOpenSolver(GasSolver2D):
             after = np.asarray(crossing_totals(fn, gn, self.lattice, top=top, incoming=True))
             exchanges.append(after-before)
         wall, outlet = exchanges
+        interface = None
+        if self.interface_face_index is not None:
+            face = self.interface_face_index
+            if type(face) is not int or not 3 <= face <= self.ny-3:
+                raise ValueError('interface_face_index must be an interior face with three rows each side')
+            lower = (crossing_moments(fn[:face],gn[:face],self.lattice,top=True,incoming=True)
+                     - crossing_moments(fp[:face],gp[:face],self.lattice,top=True))
+            upper = (crossing_moments(fn[face:],gn[face:],self.lattice,top=False,incoming=True)
+                     - crossing_moments(fp[face:],gp[face:],self.lattice,top=False))
+            m = self.mapping
+            units = m.lattice.dx_m*np.array([m.rho_scale,m.rho_scale*m.velocity_scale,
+                                              m.rho_scale*m.velocity_scale,m.pressure_scale])
+            interface = np.array([lower,upper,lower+upper])*units
         mass1, energy1 = self._totals(fn, gn)
         self.last_audit = OpenStepAudit(float(wall[0]), float(outlet[0]),
             float(wall[1]*scale), float(outlet[1]*scale),
             float(mass1-mass0-wall[0]-outlet[0]),
             float((energy1-energy0-wall[1]-outlet[1])*scale))
         self.f, self.g = fn, gn
+        self.last_interface_audit = interface
         self.t_lu += 1
         return self.last_audit

@@ -20,7 +20,7 @@ from simulation.output import dump
 from simulation.planar import collect_pulse, collect_thermal
 from simulation.power import collect_power
 from simulation.provenance import capture_source
-from simulation.study import ROOT, DEFAULTS, load_study, merge, valid_name, validate_effective
+from simulation.study import ROOT, DEFAULTS, load_study, merge, valid_name, validate_effective, synchronized_run
 
 
 def _now():
@@ -30,7 +30,11 @@ def _now():
 def _summary(data, config, previous=None):
     mapping=create_unit_mapping(config)
     run=config['run']
-    analyze={'pulse':analyze_pulse,'thermal':analyze_thermal,'power':analyze_power}[run['mode']]
+    if run['mode'] in ('interface_pulse','thermal_step'):
+        from postproc.interface import analyze_interface_pulse, analyze_thermal_step
+        analyze={'interface_pulse':analyze_interface_pulse,'thermal_step':analyze_thermal_step}[run['mode']]
+    else:
+        analyze={'pulse':analyze_pulse,'thermal':analyze_thermal,'power':analyze_power}[run['mode']]
     result=analyze(data,mapping,run,previous)
     if run['mode']=='power':
         result['model_assumptions']=deepcopy(config.get('case',{}))
@@ -39,7 +43,15 @@ def _summary(data, config, previous=None):
             for key,value in config.get('case',{}).get('paper_air',{}).items()}
     result.update(mapping=mapping.to_metadata(),steps=len(data['t_s']),
         actual_length_m=config['numerics']['ny']*mapping.lattice.dx_m,
-        validation_passed=bool(result['pass_reflection'] if run['mode']=='pulse' else all(result['gates'].values())))
+        validation_passed=bool(result['pass_reflection'] if run['mode'] in ('pulse','interface_pulse') else all(result['gates'].values())))
+    if synchronized_run(run):
+        result.update(sync_samples=len(data['t_s']),fine_steps=int(data['sync_fine_step'][-1]),
+            level_steps=np.asarray(data['level_steps']).tolist(),cell_updates=int(data['cell_updates']),
+            warmup_s=float(data['warmup_s']),advance_s=float(data['advance_s']),
+            mass_lu_definition='SI areal mass / (rho_scale * finest dx)',
+            grid=config.get('grid',{'type':'uniform'}),comparison_passed=None)
+        if bool(data.get('interface_exchange_available',False)):
+            result['max_interface_cancellation_SI']=np.max(abs(data['interface_exchange'][:,2,:]),axis=0).tolist()
     return result
 
 
@@ -81,9 +93,25 @@ def run_case(effective, output, *, source_cache=None, provenance=None):
         dump(output/'manifest.json',manifest)
         np.savez_compressed(output/'trajectory.npz',t_s=np.array([]),run_completed=False)
         dump(output/'summary.json',dict(status='running',validation_passed=None))
-        solver=PlanarOpenSolver(config)
+        if 'grid' in config:
+            from core.two_level_planar_solver import TwoLevelPlanarOpenSolver
+            solver=TwoLevelPlanarOpenSolver(config)
+        else:
+            solver=PlanarOpenSolver(config)
         print(f"{config['case']['name']}: {run['mode']}, ny={solver.ny}, dx={solver.mapping.lattice.dx_m:g}",flush=True)
-        collect={'pulse':collect_pulse,'thermal':collect_thermal,'power':collect_power}[run['mode']]
+        if synchronized_run(run):
+            from simulation.multigrid import collect_synchronized
+            collect=collect_synchronized
+            manifest.update(mass_lu_definition='SI areal mass / (rho_scale * finest dx)',
+                geometry='nx=1 planar physical cells at saved z_m with cell_width_m; shadows excluded',
+                gas_time_axis='t_s: synchronized gas endpoints',
+                film_time_axis='film_t_s: finest-step film endpoints',
+                heat_time_axis='heat_time_s: finest-step interval midpoints',
+                interface_exchange_columns=['mass_kg_m2','momentum_x_kg_m_s','momentum_y_kg_m_s','energy_J_m2'],
+                interface_exchange_rows=['into_lower','into_upper','sum'],
+                grid_layout=config['grid_layout'])
+        else:
+            collect={'pulse':collect_pulse,'thermal':collect_thermal,'power':collect_power}[run['mode']]
         data=collect(solver,output,run)
         result=_summary(data,config)
         result['status']='completed'
@@ -121,7 +149,19 @@ def run_study(path,batch,*,selected=None,source_cache=None):
     """Run selected cases; source_cache is retained only as an ignored legacy argument."""
     jobs=plan_study(path,batch,selected)
     source=capture_source(ROOT)
-    return [run_case(config,output,provenance=source) for config,output in jobs]
+    results=[]
+    for config,output in jobs:
+        result=run_case(config,output,provenance=source)
+        results.append(result)
+        if synchronized_run(config['run']):
+            # Accuracy/stationarity failures remain reviewable results. Physical
+            # failures must prevent the next, more expensive experiment.
+            physical=result.get('physical_gates',result.get('gates',{}))
+            bad=[name for name,passed in physical.items() if not passed and
+                 (name.endswith('audit') or name in ('positive_populations','finite_state','impermeable_wall','interface_exchange_recorded'))]
+            if bad:
+                raise FloatingPointError(f"{config['case']['name']}: physical validation failed: {bad}; later cases not started")
+    return results
 
 
 def analyze_case(path):
@@ -142,6 +182,6 @@ def analyze_case(path):
         if 'run_completed' in data and not bool(data['run_completed']):
             raise ValueError('trajectory is incomplete')
         result=_summary(data,config,previous)
-        if config['run']['mode']=='power':
+        if config['run']['mode']=='power' or synchronized_run(config['run']):
             result['status']='completed'
         return result

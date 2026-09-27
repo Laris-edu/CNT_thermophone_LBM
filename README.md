@@ -292,3 +292,63 @@ E1 配置入口为 `Compute/open_planar/e1_study.yaml`：平均 1.13 W、面积 
 平均温升/漂移另报；300 K 线性参照仅作独立诊断，不作为完整冷启动的精确参照门限。
 到时长上限未稳定时，`status=completed`、`validation_passed=false`；异常则保留部分数据及失败状态。
 输出尚未验证有限膜辐射、网格/域长独立性、长期热稳态或暖背景下出口适用性。
+
+## 8. 守恒两级开放平面基线
+
+`core.two_level_planar_solver.TwoLevelPlanarOpenSolver` 实现固定 `nx=1`、下细上粗、
+空间与时间比均为 2 的 cell-centered merge/explode 基线（算法来源：
+[Coreixas–Latt §3.2](https://arxiv.org/html/2504.04465v3)）。沿用 D2Q37、局部输运、
+实测偏应力和 τ22 迹通道；本入口仅接受 `diagnostic_zero` 体黏度。
+两层各自调用公共单位映射与输运本构，不叠加非平衡缩放或滤波。
+
+在 study 算例参数中加入：
+
+```yaml
+grid: {type: two_level, ratio: 2, interface_m: 0.000125364}
+sampling: {probe_interpolation: linear, sync_fine_steps: 2}
+```
+
+`refine` 仍定义最细网格；`numerics.ny` 在有效配置中为全域等效细格数。
+`grid_layout` 记录物理细/粗格、六行影子格、实际域长、同步步数及格点更新量，
+`level_mappings` 保存两层 SI/LU 映射。接口必须位于公共粗细单元面，粗层也必须恰好容纳整数格。
+未指定 `grid` 的算例保持均匀网格，旧入口默认最近格点采样。
+`probe_interpolation: linear` 在共同物理坐标对质量、动量和总能量插值后恢复观测量；不改求解状态。
+均匀对照指定 `sync_fine_steps: 2`，与两级同步气体观测频率一致。
+
+每个宏步先碰撞/迁移粗格、处理顶部边界，将向下布居展开到细影子格；随后两次仅碰撞物理细格，
+影子只迁移，每次处理底壁；最后成对平均向上影子布居，只填粗迁移缺失链接。
+`step_temperature(T)` 接受中点常量或时间函数；`step_wall_energy(callback)` 的回调为
+`callback(exchange_J_m2, substep_index, midpoint_time_s)`，每宏步调用两次。
+影子不进入储能、探针、物理剖面或格点碰撞计数。宏步全部检查成功才提交物理状态、时钟和审计。
+`coupling.planar_open.step_two_level_open_film` 返回两条细步膜记录及一条同步气体审计；
+与均匀入口共用 `solve_film_midpoint`，使用实际漫反射壁交换。
+
+四文件契约不变，新增轨迹口径为：
+
+- `t_s`：气体同步端点；`sync_fine_step`：对应细步累计数。
+- `film_t_s`：细步膜温端点；`heat_time_s`：细步热流中点。
+- `wall_energy_J_m2`、输入功和热漏：已积分的细区间能量；按区间求和，不再乘 dt 或梯形积分。
+- `z_m`、`cell_width_m`、`level_index`：仅物理单元；气体储能与 SI 面质量 `mass_kg_m2` 均按宽度加权。
+  兼容 `mass_lu` 统一为面质量除以 `rho_scale * finest_dx`。
+- `interface_exchange[sync, side, moment]`：上下两侧独立实际链接交换及其和；四矩为质量、x/y 动量、总能量，
+  SI 单位依次 kg/m²、kg/(m·s)、kg/(m·s)、J/m²，正号为进入该块。
+  `block_conserved` 独立保存两块储量。均匀脉冲/阶跃记录同位置内部面的交换。
+- `level_steps=[fine,coarse]`、`cell_updates`：实际成功推进工作量，分别记录预热、推进及总耗时。
+  失败轨迹截止最后完整同步点。
+
+`mode: interface_pulse` 支持独立双向接口实验；它的反射窗口由源、接口与探针决定，
+不改变旧 `mode: pulse` 的出口反射含义。`mode: thermal_step` 检查热扰动跨界面的实际交换和传导矩。
+给温/功率仍复用现有分析入口；功率独立核查细步膜储能、同步气体储能及膜气总储能。
+`validation_passed` 含义保持原约定，新增均匀对照误差另写 `final/comparison.json` 中的 `comparison_passed`。
+运行完成、旧判据通过、新比较目标通过三者分别报告；固定 20 周期冷启动不自动等于周期稳定。
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/multi_grid/study.yaml --batch new_batch --dry-run
+# 先选择 pulse_up/down 与 step 的六个算例，检查守恒、有限性、正性后，再运行 thermal 和 power 对照。
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/multi_grid/study.yaml --batch new_batch --case pulse_up_two_level pulse_up_uniform pulse_down_two_level pulse_down_uniform step_two_level step_uniform
+.\.venv\Scripts\python.exe -m Compute.multi_grid.compare --batch Compute/multi_grid/new_batch
+.\.venv\Scripts\python.exe -m Compute.multi_grid.plot --batch Compute/multi_grid/new_batch
+```
+
+该实现是静态一维保守接口的研究基线；方法创新性需以相对此基线的实质改进和误差证据论证。
+它尚不覆盖动态自适应、多级网格、多维膜器件、长期热稳态或一般暖背景出口。

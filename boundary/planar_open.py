@@ -42,6 +42,15 @@ def crossing_totals(f, g, lattice, *, top, incoming=False):
     return _link_totals(f[rows, :, directions], g[rows, :, directions], kinetic)
 
 
+def crossing_moments(f, g, lattice, *, top, incoming=False):
+    """Actual crossing mass, x/y momentum and total energy (LU), per x cell."""
+    rows, directions, kinetic = _crossing_links(tuple(map(tuple, lattice.c)), top, incoming)
+    fl, gl = f[rows, :, directions], g[rows, :, directions]
+    mass, energy = _link_totals(fl, gl, kinetic)
+    momentum = np.sum(fl[..., None]*lattice.c[directions,None,:],axis=(0,1))/f.shape[1]
+    return np.array([mass,*momentum,energy])
+
+
 class PreparedDiffuseWall:
     """One collided state's fixed outgoing links and temperature-dependent inflow.
 

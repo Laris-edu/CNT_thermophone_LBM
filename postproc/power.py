@@ -7,7 +7,7 @@ from reference.lim2013 import matched_gas, film_temperature_hat, exact_pressure_
 
 
 def _channels(data):
-    yield 'film_temperature', data['t_s'], data['film_temperature_K']
+    yield 'film_temperature', data.get('film_t_s',data['t_s']), data['film_temperature_K']
     yield 'wall_flux', data['heat_time_s'], data['wall_flux_W_m2']
     for j in range(data['pressure_Pa'].shape[1]):
         yield f'pressure_{j}', data['t_s'], data['pressure_Pa'][:,j]
@@ -74,6 +74,25 @@ def energy_balances(data, film):
     gas_storage=data['gas_energy_J_m2']-float(data['initial_gas_energy_J_m2'])
     work=data['input_energy_J_m2']; leak=data['leak_energy_J_m2']
     wall=audit[:,2]; outlet=audit[:,3]; factor=film['gas_flux_factor']
+    if 'sync_fine_step' in data:
+        ends=np.asarray(data['sync_fine_step'],dtype=int)
+        if (len(ends)!=len(audit) or len(ends)==0 or np.any(np.diff(ends)<=0)
+                or ends[-1]!=len(film_storage)):
+            raise ValueError('sync_fine_step must partition every fine film interval')
+        fine_wall=np.asarray(data['wall_energy_J_m2'])
+        film_step=np.diff(film_storage,prepend=0.)-work+leak+factor*fine_wall
+        film_cumulative=film_storage-np.cumsum(work-leak-factor*fine_wall)
+        storage_at_sync=film_storage[ends-1]
+        def aggregate(values):
+            return np.diff(np.concatenate(([0.],np.cumsum(values)[ends-1])))
+        df=np.diff(storage_at_sync,prepend=0.); dg=np.diff(gas_storage,prepend=0.)
+        sync_work=aggregate(work); sync_leak=aggregate(leak)
+        return dict(film_storage=film_storage,gas_storage=gas_storage,
+            film_step=film_step,gas_step=dg-wall-outlet,
+            total_step=df+factor*dg-sync_work+sync_leak-factor*outlet,
+            film_cumulative=film_cumulative,
+            gas_cumulative=gas_storage-np.cumsum(wall+outlet),
+            total_cumulative=storage_at_sync+factor*gas_storage-np.cumsum(sync_work-sync_leak+factor*outlet))
     df=np.diff(film_storage,prepend=0.); dg=np.diff(gas_storage,prepend=0.)
     return dict(film_storage=film_storage,gas_storage=gas_storage,
         film_step=df-work+leak+factor*wall,gas_step=dg-wall-outlet,

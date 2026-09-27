@@ -15,7 +15,11 @@ def main():
         jobs=plan_study(args.config,args.batch,args.case)
         if args.dry_run:
             for config,output in jobs:
-                print(f"{config['case']['name']}: {config['run']['mode']}, {config['numerics']['steps']} steps -> {output}")
+                layout=config.get('grid_layout')
+                detail=(f", coarse/sync steps={layout['sync_steps']}, physical cells="
+                        f"{layout['fine_cells']}+{layout['coarse_cells']}, shadows={layout['shadow_cells']}, "
+                        f"cell updates={layout['cell_updates']}" if layout else '')
+                print(f"{config['case']['name']}: {config['run']['mode']}, fine steps={config['numerics']['steps']}{detail} -> {output}")
             return 0
         run_study(args.config,args.batch,selected=args.case)
     except (ValueError,FileExistsError) as exc:
