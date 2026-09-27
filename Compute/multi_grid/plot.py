@@ -42,8 +42,8 @@ def _pair(batch,name):
     return cases
 
 
-def _figure(rows):
-    fig,axes=plt.subplots(rows,2,figsize=(180/25.4,(64*rows+12)/25.4),
+def _figure(rows,columns=2):
+    fig,axes=plt.subplots(rows,columns,figsize=(180/25.4,(64*rows+12)/25.4),
                           layout='constrained',squeeze=False)
     for j,ax in enumerate(axes.flat):
         ax.set_label(chr(ord('a')+j))
@@ -120,26 +120,38 @@ def plot_step(batch,audit_tools=None):
     cases=_pair(batch,'step')
     if cases is None:
         return None
-    fig,axes=_figure(1); a,b=axes[0]; _method_legend(fig)
+    fig,axes=_figure(1,3); a,q,b=axes[0]; _method_legend(fig)
+    # Equal plot widths and gutters despite the different numeric tick widths.
+    fig.set_layout_engine(None)
+    fig.subplots_adjust(left=.08,right=.97,bottom=.30,top=.79,wspace=.65)
     config=cases[0][0]; gas=matched_gas(create_unit_mapping(config))
     face=config['run']['thermal_step']['interface_m']; uniform=cases[0][3]; two_level=cases[1][3]
     for case,(label,color,style) in zip(cases,METHODS):
         data=case[3]
-        a.plot(data['z_m']*1e6,(data['profile_temperature_K'][-1]-gas.T0_K)*1e3,
+        # Explicit interface zoom also avoids invisible, clipped PDF strokes
+        # extending through the neighboring panel's labels in geometry audits.
+        visible=data['z_m']<=4*face
+        a.plot(data['z_m'][visible]*1e6,(data['profile_temperature_K'][-1,visible]-gas.T0_K)*1e3,
                color=color,ls=style,lw=1.1)
+        near=(data['z_m']>=.65*face)&(data['z_m']<=1.45*face)
+        q.plot(data['z_m'][near]*1e6,data['profile_conductive_heat_flux_W_m2'][-1,near],
+               color=color,ls=style,lw=1.1,marker='.',ms=2)
     a.axvline(face*1e6,color=GOLD,ls=':',lw=.9)
     a.set_xlim(0,4*face*1e6)
     a.set_xlabel('Distance from film (µm)'); a.set_ylabel('Gas temperature increment (mK)')
-    a.set_title('a  Final temperature: interface region',loc='left',fontweight='bold')
+    a.set_title('a  Final temperature',loc='left',fontweight='bold')
+    q.axvline(face*1e6,color=GOLD,ls=':',lw=.9)
+    q.set_xlabel('Distance from film (µm)'); q.set_ylabel('Conductive heat flux (W/m²)')
+    q.set_title('b  Interface heat-flux moment',loc='left',fontweight='bold')
     ends=two_level['sync_fine_step'].astype(int)-1; t=two_level['t_s']*1e6
     wall=(np.cumsum(two_level['wall_energy_J_m2'])[ends]-np.cumsum(uniform['wall_energy_J_m2'])[ends])
     interface=np.cumsum(two_level['interface_exchange'][:,1,3]-uniform['interface_exchange'][:,1,3])
     b.plot(t,1e3*wall,color=BLUE,lw=1.1,label='Wall exchange')
     b.plot(t,1e3*interface,color=GOLD,lw=1.1,label='Into upper block')
     b.axhline(0,color=GRAY,ls=':',lw=.7)
-    b.legend(loc='upper center',bbox_to_anchor=(.5,-.24),ncol=2,frameon=False)
+    b.legend(loc='upper center',bbox_to_anchor=(.5,-.24),ncol=1,frameon=False)
     b.set_xlabel('Time (µs)'); b.set_ylabel('Cumulative energy difference (mJ/m²)')
-    b.set_title('b  Actual exchange: two level − uniform',loc='left',fontweight='bold')
+    b.set_title('c  Actual exchange difference',loc='left',fontweight='bold',fontsize=7)
     return _export(fig,batch,'thermal_step',audit_tools)
 
 
@@ -155,8 +167,12 @@ def plot_responses(batch,audit_tools=None):
         for case,(label,color,style) in zip(cases,METHODS):
             data=case[3]
             if name=='thermal':
-                axes[row,0].plot(data['t_s']*1e6,data['pressure_Pa'][:,probe]-gas.p0_Pa,color=color,ls=style,lw=1.1)
-                axes[row,1].plot(data['heat_time_s']*1e6,data['wall_flux_W_m2'],color=color,ls=style,lw=1.1)
+                # Show the predeclared last-two-cycle comparison window.
+                start=(run['cycles']-2)/run['frequency_Hz']; end=run['cycles']/run['frequency_Hz']
+                gas_window=(data['t_s']>=start)&(data['t_s']<=end)
+                heat_window=(data['heat_time_s']>=start)&(data['heat_time_s']<=end)
+                axes[row,0].plot(data['t_s'][gas_window]*1e6,data['pressure_Pa'][gas_window,probe]-gas.p0_Pa,color=color,ls=style,lw=1.1)
+                axes[row,1].plot(data['heat_time_s'][heat_window]*1e6,data['wall_flux_W_m2'][heat_window],color=color,ls=style,lw=1.1)
                 for ax in axes[row]:
                     ax.set_xlim((run['cycles']-2)/run['frequency_Hz']*1e6,run['cycles']/run['frequency_Hz']*1e6)
                     ax.set_xlabel('Time (µs)')
