@@ -115,8 +115,11 @@ def collect_synchronized(solver, output, run):
             profiles[name].append(value)
     profile(0.,state)
     warmup_started=time.perf_counter()
-    for mapping in ([m,solver.coarse_mapping] if multigrid else [m]):
-        collide_fg(solver.f[:3].copy(),solver.g[:3].copy(),mapping,lattice=solver.lattice,backend=solver.collision_backend)
+    if multigrid:
+        for mapping in (m,solver.coarse_mapping):
+            collide_fg(solver.f[:3].copy(),solver.g[:3].copy(),mapping,lattice=solver.lattice,backend=solver.collision_backend)
+    else:
+        solver.warmup_collision()
     warmup_s=time.perf_counter()-warmup_started
     started=time.perf_counter(); advance_s=0.; last_progress=started; last_cycle=0
     profile_spacing=1/(run['frequency_Hz']*sampling.get('profile_samples_per_cycle',32))
@@ -135,8 +138,10 @@ def collect_synchronized(solver, output, run):
         values.update(pressure_Pa=np.asarray(pressure).reshape(-1,len(probes)),
             velocity_m_s=np.asarray(velocity).reshape(-1,len(probes)))
         return values
+    checkpoint=None; committed_count=0; committed_min=(min_f,min_g)
     try:
         for k in range(sync_steps):
+            checkpoint=solver.checkpoint()
             pending=[]; pair=[]; pair_exchanges=[]; advance_started=time.perf_counter()
             if multigrid:
                 if mode=='power':
@@ -174,7 +179,8 @@ def collect_synchronized(solver, output, run):
                 state.rho[-1,0]*m.rho_scale,state.u[-1,0,1]*m.velocity_scale,state.p[-1,0]*m.pressure_scale)
             p=observed['p']*m.pressure_scale; u=observed['u'][:,1]*m.velocity_scale
             af=np.asarray(astuple(sync_audit) if hasattr(sync_audit,'__dataclass_fields__') else sync_audit,dtype=float)
-            if not all(np.isfinite(v).all() for v in (values,p,u,af,solver.f,solver.g)) or min(np.min(solver.f),np.min(solver.g))<=0:
+            extrema=(float(np.min(solver.f)),float(np.min(solver.g))) if multigrid else solver.population_extrema()
+            if not all(np.isfinite(v).all() for v in (values,p,u,af,extrema)) or min(extrema)<=0:
                 raise FloatingPointError('nonfinite state or nonpositive populations; no clipping applied')
             combined=running_audit+af
             wall_masses=[(item.audit if mode=='power' else item if multigrid else item[1]).wall_mass_lu for item in pending]
@@ -233,11 +239,14 @@ def collect_synchronized(solver, output, run):
                         item.power_W_m2,item.input_energy_J_m2,item.leak_energy_J_m2))
                 for name,value in zip(fine_names,fine_values):
                     fine[name].append(value)
-            min_f=min(min_f,float(np.min(solver.f))); min_g=min(min_g,float(np.min(solver.g)))
+            min_f=min(min_f,extrema[0]); min_g=min(min_g,extrema[1])
             if mode=='thermal_step':
                 probe_heat.append(np.interp(probes,z,solver.get_heat_flux_lu()[:,0,1])*m.heat_flux_scale)
             if t>=next_profile-1e-12*dt:
                 profile(t,state); next_profile=(math.floor(t/profile_spacing)+1)*profile_spacing
+            committed_count=k+1
+            committed_min=(min_f,min_g)
+            checkpoint=None
             cycle=int(math.floor(t*run['frequency_Hz']+1e-10))
             if mode=='power' and cycle>last_cycle:
                 last_cycle=cycle; stop=run['stopping']
@@ -251,6 +260,13 @@ def collect_synchronized(solver, output, run):
         if history['t_s'] and profiles['t_s'][-1]!=history['t_s'][-1]:
             profile(history['t_s'][-1],state)
         completed=True
+    except BaseException:
+        if checkpoint is not None:
+            solver.restore(checkpoint)
+            min_f,min_g=committed_min
+            if mode=='power':
+                temperature=committed_temperature
+        raise
     finally:
         counts=[len(audits),len(pressure),len(velocity),len(exchanges),
             *(len(values) for values in history.values()),*(len(values)//2 for values in fine.values())]
@@ -258,7 +274,7 @@ def collect_synchronized(solver, output, run):
             counts.append(len(block_history))
         if mode=='thermal_step':
             counts.append(len(probe_heat))
-        count=min(counts)
+        count=min(min(counts),committed_count)
         for values in history.values():
             del values[count:]
         for values in fine.values():
@@ -285,6 +301,11 @@ def collect_synchronized(solver, output, run):
             cell_updates=int(solver.cell_updates if multigrid else solver.t_lu*solver.ny),
             work_count_scope='successful level steps; attempted rolled-back collisions excluded')
         data['mass_kg_m2']=data['mass_lu']*m.rho_scale*m.lattice.dx_m
+        moment_state=getattr(solver,'moments',None)
+        data.update(state_storage_bytes=int(moment_state.nbytes if moment_state is not None else
+            solver.f.nbytes+solver.g.nbytes),representation_equivalence_only=moment_state is not None)
+        if moment_state is not None:
+            data['moment_state_final']=moment_state.copy()
         if face is not None:
             data.update(block_conserved=np.asarray(block_history).reshape(-1,2,4),initial_block_conserved=initial_blocks)
         if mode=='interface_pulse':

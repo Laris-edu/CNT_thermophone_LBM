@@ -185,6 +185,11 @@ def validate_effective(config):
     validate_run(run)
     valid_name(config['case']['name'])
     validate_collision_backend(config['numerics'].get('collision_backend', 'numpy'))
+    representation=config['numerics'].get('state_representation','populations')
+    if representation not in ('populations','moments9'):
+        raise ValueError('state_representation must be populations or moments9')
+    if representation=='moments9' and ('grid' in config or not synchronized_run(run)):
+        raise ValueError('moments9 requires a uniform grid and sync_fine_steps=2')
     mapping=create_unit_mapping(config)
     nx,ny=config['numerics']['nx'],config['numerics']['ny']
     if nx != 1 or not isinstance(ny,int) or ny < 8 or config['numerics']['boundary'] != 'planar_open_y':
@@ -276,6 +281,7 @@ def prepare_case(parameters, base_config=BASE):
     parameters=deepcopy(parameters)
     name=valid_name(parameters.pop('name','case'))
     grid=parameters.pop('grid',None)
+    representation=parameters.pop('state_representation','populations')
     defaults=POWER_DEFAULTS if parameters.get('mode')=='power' else DEFAULTS
     run=merge(defaults,parameters)
     if grid is not None:
@@ -288,6 +294,7 @@ def prepare_case(parameters, base_config=BASE):
     config['lattice']['dt_s'] /= run['refine']
     ny=int(round(run['length_m']/config['lattice']['dx_m']))
     config['numerics'].update(nx=1,ny=ny,boundary='planar_open_y')
+    config['numerics']['state_representation']=representation
     config['case'].update(name=name,purpose='single-sided open planar '+run['mode'])
     config['run']=run
     if grid is not None:

@@ -60,3 +60,25 @@ def test_harmonic_comparison_rejects_a_truncated_film_axis_before_pairwise_error
     b['film_t_s']=b['film_t_s'][:-1]
     with pytest.raises(ValueError,match='film_t_s'):
         harmonic_comparison(a,b,config)
+
+
+def test_identical_thermal_step_remains_serializable_at_zero_initial_heat_flux():
+    import json
+    from Compute.multi_grid.compare import step_comparison
+    data=dict(z_m=np.arange(8)+.5,cell_width_m=np.ones(8),profile_t_s=np.array([0.,1.]),
+        profile_temperature_K=np.full((2,8),300.),
+        profile_conductive_heat_flux_W_m2=np.array([np.zeros(8),np.exp(-np.arange(8))]),
+        wall_energy_J_m2=np.array([.1,.2]),interface_exchange=np.zeros((2,3,4)))
+    data['interface_exchange'][:,1,3]=.01
+    config=dict(run=dict(amplitude_K=.1,thermal_step=dict(interface_m=4.)))
+    result=step_comparison(data,data,config)
+    assert all(result['gates'].values())
+    assert result['conductive_moment_localization']['squared_error_fraction_in_strip'] is None
+    assert result['conductive_moment_localization']['peak_relative_to_local_reference'] is None
+    json.dumps(result,allow_nan=False)
+
+
+def test_final_moment_check_rejects_missing_observations():
+    from Compute.multi_grid.compare_moments import final_moment_check
+    with pytest.raises(ValueError,match='missing final-state observations'):
+        final_moment_check({}, {}, 1e-10, 1e-12)

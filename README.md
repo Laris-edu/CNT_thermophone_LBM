@@ -352,3 +352,105 @@ sampling: {probe_interpolation: linear, sync_fine_steps: 2}
 
 该实现是静态一维保守接口的研究基线；方法创新性需以相对此基线的实质改进和误差证据论证。
 它尚不覆盖动态自适应、多级网格、多维膜器件、长期热稳态或一般暖背景出口。
+
+## 9. 热—声分场研究：同网格九矩入口
+
+`core.moment_planar_solver.MomentPlanarOpenSolver` 是现有正则化 D2Q37 算法的九矩状态表示。
+它保留局部输运、实测应力及其迹、真实热壁交换和原膜中点耦合。目前只接受均匀网格、`nx=1`；
+**不是已经完成的热细声粗求解器，也不代表研究对照 C/D。**
+算例参数增加 `state_representation: moments9`，并指定 `sampling.sync_fine_steps: 2`；
+缺省 `populations` 保持原入口。有效配置选择项在 `numerics.state_representation`。
+`moments9` 与 `grid` 同时出现会报错，不会静默退回均匀网格。
+
+令 $F=(f,g)$，固定线性提取算子 $B$ 定义
+
+$$
+z=BF=(\rho,j_x,j_y,E,M_{xx},M_{xy},M_{yy},J_{E,x},J_{E,y}),\quad
+M_{ab}=\sum_i c_{ia}c_{ib}f_i,
+$$
+$$
+E=\sum_i(\tfrac12|c_i|^2f_i+g_i),\qquad
+\boldsymbol J_E=\sum_i\boldsymbol c_i(\tfrac12|c_i|^2f_i+g_i).
+$$
+
+从这九个量可以恢复原碰撞使用的全部量：
+
+$$
+u=j/\rho,\quad p=(\gamma-1)(E-\tfrac12\rho|u|^2),\quad \theta=p/\rho,
+\quad P=M-\rho uu,\quad\Pi=P-pI,\quad q_{raw}=J_E-Eu-Pu.
+$$
+
+原碰撞的局部输运只依赖 $\rho,\theta$，非平衡重构只依赖 $\Pi,q_{raw}$。
+故存在同一重构算子 $\mathcal C$，使 `collide(F)` 等价于 $\mathcal C(BF)$；
+九矩推进为 $z^{n+1}=B\,\mathcal W\,S\,\mathcal C(z^n)$，$S$ 是原流步、
+$\mathcal W$ 是原壁面/出口填充。这里是精确算术下的离散因式分解，实际比较允许浮点累积差，
+不是把连续 NSF 方程的截断误差当作离散等价证据。65 维 $\ker B$ 在现有碰撞中被消去，
+流步可以重新产生它，但下一次碰撞仍只需九矩。
+
+公共接口位于 `core.kinetic_moments`：
+
+| 接口 | 数据含义 |
+|---|---|
+| `extract_moments(f,g,lattice=None)` | 从真实布居提取末轴为 9 的原始矩 |
+| `recover_moment_macro(z,mapping)` | 恢复现有 `MacroState`，含平动、内部及总能量 |
+| `collide_moments(z,mapping,lattice=None,backend='numpy')` | 共用原碰撞重构，返回真实碰撞后布居 |
+| `heat_flux_moments(z,mapping)` | 乘公共局部半步读出因子的传导矩；不是壁面交换 |
+| `pressure_entropy_coordinates(z,mapping)` / `moments_from_pressure_entropy(coords,mapping)` | 可逆压力—速度—熵—应力—原始热流坐标 |
+
+后一坐标顺序为 $(p,u_x,u_y,\sigma,\Pi_{xx},\Pi_{xy},\Pi_{yy},q_{raw,x},q_{raw,y})$，其中
+$\sigma=\ln(p/p_0)-\gamma\ln(\rho/\rho_0)$，参考态来自实际 mapping。
+它是热力学坐标，不是非平衡布居的离散 H 熵。正反变换拒绝非法密度/压力，不做裁剪。
+`MomentPlanarOpenSolver.moments` 持久保存 `(ny,1,9)`，`f/g` 保持 `None`；每步仍暂存 37 方向的
+碰撞后及流步布居并检查真实正性。因而 9/74 只是持久气体状态的大小比，不能代替峰值内存或实测加速。
+
+四文件生命周期保持不变；新增 `state_storage_bytes`、`representation_equivalence_only`，
+九矩轨迹另存 `moment_state_final`。它是最终原始矩，不能当作已实现续算协议。
+同步入口的失败恢复涵盖气体、时钟、审计和未提交观测；膜温只在成功同步后写入历史。
+`PlanarOpenSolver.checkpoint()/restore()` 与九矩/两级同名方法用于这一事务，副本归调用方所有。
+
+复现入口为 `Compute/multi_grid/moment_study.yaml`，保持原脉冲、阶跃、给温和功率的物理参数。
+先执行双向脉冲和阶跃，再根据证据决定是否开展周期长算例：
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/multi_grid/moment_study.yaml --batch new_moment_batch --dry-run
+.\.venv\Scripts\python.exe -m scripts.run_compute --config Compute/multi_grid/moment_study.yaml --batch new_moment_batch --case pulse_up_populations pulse_up_moments9 pulse_down_populations pulse_down_moments9 step_populations step_moments9
+.\.venv\Scripts\python.exe -m Compute.multi_grid.compare_moments --batch Compute/multi_grid/new_moment_batch --pair pulse_up pulse_down step
+```
+
+专题比较只读四文件，检查相同源码、物理配置与时间坐标；不平移波形、不补偿幅相。
+逐元素数值等价目标单独记录为 `rtol=1e-10, atol=1e-12`（各数组自身单位）；
+它与原物理 `validation_passed`、1%/1° 波形目标分开。
+近零热流可能由大能流项相消产生，必须同时查看绝对误差和信号归一化误差，不能只看一个布尔值。
+阶段性批次可用 `--pair` 选择已完成的对子，未运行组不计入通过。
+历史基线的只读定位与可选移动接口短实验由 `Compute.multi_grid.audit_interface` 执行，
+`--output-batch` 必须为新目录；`--run-moved-interface --interface-m ...` 才会启动计算。
+
+**独立网格的方程关仍未通过。**同一 $\rho,j,E$ 可有不同应力或热流，并在下一步产生不同宏观量，
+这一反例已纳入回归；不能只保留四个宏观量，也不能把 `f/g` 分别命名为声/热。
+线性参考态附近有
+
+$$
+\frac{\rho'}{\rho_0}=\frac{p'}{\gamma p_0}-\frac{\sigma'}\gamma,\qquad
+\frac{T'}{T_0}=\frac{\gamma-1}{\gamma}\frac{p'}{p_0}+\frac{\sigma'}\gamma.
+$$
+
+连续能量余额给出 $D_t p+\gamma p\nabla\cdot u=-(\gamma-1)(\Pi:\nabla u+\nabla\cdot q)$，
+$D_t\sigma=-(\gamma-1)(\Pi:\nabla u+\nabla\cdot q)/p$。
+热流同时驱动压力和熵；近等压热层仍需热膨胀速度和局部输运反馈。
+把 $p,u,\Pi$ 直接粗化而只细化 $\sigma,q$，尚缺细尺度密度/速度/应力修正及守恒通量闭合。
+这些连续式解释耦合，不能用它们的残差替代离散独立储能审计。
+连续式中的 $\Pi,q$ 是物理应力通量和传导热流，不能直接用碰撞前原始非平衡矩代替。
+因此当前不进入独立分场网格、组合加密或二维性能宣称；九矩入口是用于推导与误差隔离的工具。
+
+以下文献约束研究定位，而非本实现的新颖性证明（检索核对日期 2026-09-29）：
+
+| 已有路线 | 本研究需要另外解决的问题 |
+|---|---|
+| [Dorari 等，2018，分网格/分时间步耦合输运](https://doi.org/10.1016/j.apm.2018.06.023)，用于枝晶的动量、溶质和热输运 | 已有“多物理不同尺度使用不同网格/步长”的先例；不能将一般构想视为首次提出 |
+| [Nabavizadeh 等，2021，自然对流](https://www.mdpi.com/2311-5521/6/4/148)，热与流使用不同网格/步长 | 不可压 Boussinesq 假设不能直接提供可压热致声源与压力功闭合 |
+| [Wissocq 等，2022，守恒分离模型](https://doi.org/10.1063/5.0083377)，利用 LBM 通量构造守恒总能量离散 | 熵特征与能量守恒必须一起处理；本项目需进一步处理独立网格和真实膜气交换 |
+| [Zhao 等，2023，PRECCINSTA 热声燃烧](https://doi.org/10.1016/j.compfluid.2023.105898) | 已有 LBM 热声与非均匀网格案例，不能声称首次将二者结合 |
+| [矩空间信息传递的多尺度框架，2026](https://doi.org/10.1016/j.cpc.2026.110025)，用于激光诱导合成 | 已有多物理尺度分离与矩投影先例；本文研究目标需以微弱声压、能量交换和额外成本收益区分 |
+
+上述文献并不能证明本项目独立网格方案已经闭合。数值结论以批次 `final/` 数据为准，
+不将九矩状态压缩、可逆坐标或局部恒等式作为完整方法创新或器件验证。

@@ -83,11 +83,12 @@ def step_comparison(a,b,config):
     peak=np.unravel_index(np.argmax(abs(difference)),difference.shape)
     localization=dict(width_weighted_snapshot_l2=float(np.sqrt(np.sum(weighted_error)/np.sum(qb*qb*widths))),
         strip_halfwidth_m=float(3*np.max(widths)),
-        squared_error_fraction_in_strip=float(np.sum(weighted_error[:,near])/np.sum(weighted_error)),
+        squared_error_fraction_in_strip=(float(np.sum(weighted_error[:,near])/np.sum(weighted_error))
+            if np.sum(weighted_error)>0 else None),
         max_error_outside_strip_W_m2=float(np.max(abs(difference[:,~near]))),
         peak_time_s=float(a['profile_t_s'][peak[0]]),peak_z_m=float(a['z_m'][peak[1]]),
         peak_two_level_W_m2=float(qa[peak]),peak_uniform_W_m2=float(qb[peak]),
-        peak_relative_to_local_reference=float(difference[peak]/qb[peak]))
+        peak_relative_to_local_reference=(float(difference[peak]/qb[peak]) if qb[peak]!=0 else None))
     return dict(max_temperature_error_over_wall_increment=error,
         wall_energy_J_m2=[wall_a,wall_b],interface_energy_into_upper_J_m2=[iface_a,iface_b],
         wall_cumulative_relative_error=wall_error,interface_cumulative_relative_error=interface_error,

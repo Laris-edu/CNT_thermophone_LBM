@@ -164,6 +164,36 @@ class TwoLevelPlanarOpenSolver:
         ff, gf, fc, gc = self._require_level_state()
         return np.concatenate((ff, fc)), np.concatenate((gf, gc))
 
+    def checkpoint(self):
+        """Own physical state until synchronized observations also commit.
+
+        Shadow populations are local to step_wall_energy and need no snapshot.
+        Copying both physical levels is intentional rollback overhead.
+        """
+        ff, gf, fc, gc = self._require_level_state()
+        return dict(fine_f=ff.copy(), fine_g=gf.copy(), coarse_f=fc.copy(), coarse_g=gc.copy(),
+            t_lu=self.t_lu, fine_t_lu=self.fine_solver.t_lu, coarse_t_lu=self.coarse_solver.t_lu,
+            last_audit=deepcopy(self.last_audit), last_substep_audits=deepcopy(self.last_substep_audits),
+            last_interface_audit=deepcopy(self.last_interface_audit),
+            last_momentum_residual_kg_m_s=deepcopy(self.last_momentum_residual_kg_m_s),
+            level_steps=self.level_steps.copy(), cell_updates=self.cell_updates)
+
+    def restore(self, checkpoint):
+        """Restore arrays, clocks and audits without sharing mutable snapshot data."""
+        ff, gf, fc, gc = (checkpoint[name].copy()
+                          for name in ('fine_f', 'fine_g', 'coarse_f', 'coarse_g'))
+        self.fine_solver.f, self.fine_solver.g = ff, gf
+        self.coarse_solver.f, self.coarse_solver.g = fc, gc
+        self.t_lu = checkpoint['t_lu']
+        self.fine_solver.t_lu = checkpoint['fine_t_lu']
+        self.coarse_solver.t_lu = checkpoint['coarse_t_lu']
+        self.last_audit = deepcopy(checkpoint['last_audit'])
+        self.last_substep_audits = deepcopy(checkpoint['last_substep_audits'])
+        self.last_interface_audit = deepcopy(checkpoint['last_interface_audit'])
+        self.last_momentum_residual_kg_m_s = deepcopy(checkpoint['last_momentum_residual_kg_m_s'])
+        self.level_steps = checkpoint['level_steps'].copy()
+        self.cell_updates = checkpoint['cell_updates']
+
     def get_macro(self):
         f, g = self._require_state()
         return recover_macro(f, g, D=self.mapping.lattice.D, S=self.mapping.lattice.S, lattice=self.lattice)

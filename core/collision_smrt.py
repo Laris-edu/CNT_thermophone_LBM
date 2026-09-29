@@ -237,6 +237,11 @@ def _regularized_f_collision(
     """
 
     stress = _nonequilibrium_central_stress(f, f_eq, u, lattice)
+    return _reconstruct_stress(stress, f_eq, u, mapping, lattice, transport)
+
+
+def _reconstruct_stress(stress, f_eq, u, mapping, lattice, transport):
+    """Shared measured-stress reconstruction for populations and nine moments."""
     stress_xy = stress[..., 0, 1]
     stress_dev = stress[..., 0, 0] - stress[..., 1, 1]
     tau21 = transport.tau21
@@ -283,9 +288,13 @@ def _regularized_heat_flux_collision(
     transport mapping decision.
     """
 
-    heat_flux_factor = transport.heat_flux_retention[..., None]
-
     total_heat_flux = central_energy_flux_lu(f_before, g_before, u=u, lattice=lattice)
+    return _reconstruct_heat_flux(f_post, g_eq, total_heat_flux, u, mapping, lattice, transport)
+
+
+def _reconstruct_heat_flux(f_post, g_eq, total_heat_flux, u, mapping, lattice, transport):
+    """Shared projection of measured total central energy flux."""
+    heat_flux_factor = transport.heat_flux_retention[..., None]
     target_heat_flux = heat_flux_factor * total_heat_flux
     f_fraction = mapping.collision.regularized_heat_flux_f_fraction
     f_heat_flux = f_fraction * target_heat_flux - _central_translational_energy_flux_lu(
@@ -322,9 +331,13 @@ def _correct_f_conserved_moments(
     lattice: Lattice,
 ) -> np.ndarray:
     rho_before = np.sum(f_before, axis=-1)
+    momentum_before = np.einsum("...a,ai->...i", f_before, lattice.c)
+    return _correct_f_targets(f_post, rho_before, momentum_before, lattice)
+
+
+def _correct_f_targets(f_post, rho_before, momentum_before, lattice):
     rho_after = np.sum(f_post, axis=-1)
     corrected = f_post + (rho_before - rho_after)[..., None] * lattice.w
-    momentum_before = np.einsum("...a,ai->...i", f_before, lattice.c)
     momentum_after = np.einsum("...a,ai->...i", corrected, lattice.c)
     dm = momentum_before - momentum_after
     cx = lattice.c[:, 0]
@@ -333,6 +346,19 @@ def _correct_f_conserved_moments(
     denom_y = float(np.sum(lattice.w * cy * cy))
     corrected = corrected + (dm[..., 0, None] * lattice.w * cx / denom_x)
     return corrected + (dm[..., 1, None] * lattice.w * cy / denom_y)
+
+
+def _reconstruct_collision(macro, stress, q_raw, momentum, f_eq, g_eq, transport, mapping, lattice):
+    """Reconstruct one collision from its sufficient measured moments."""
+    f_post = _reconstruct_stress(stress, f_eq, macro.u, mapping, lattice, transport)
+    f_post = _correct_f_targets(f_post, macro.rho, momentum, lattice)
+    f_post, g_shape = _reconstruct_heat_flux(
+        f_post, g_eq, q_raw, macro.u, mapping, lattice, transport)
+    f_post = _correct_f_targets(f_post, macro.rho, momentum, lattice)
+    macro_mid = recover_macro(f_post, g_shape, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
+    delta_G = macro.E_tot - macro_mid.E_tot
+    g_post = g_shape + delta_G[..., None] * (f_eq / macro.rho[..., None])
+    return f_post, g_post
 
 
 def collide_fg(
@@ -379,17 +405,11 @@ def collide_fg(
         f_post, g_post = collide_prepared(f, g, f_eq, g_eq, macro_before, transport,
                                         mapping, lattice, projectors)
     else:
-        f_post = _regularized_f_collision(
-            f, f_eq, macro_before.u, mapping, lattice, transport=transport)
-        f_post = _correct_f_conserved_moments(f_post, f, lattice)
-        f_post, g_shape = _regularized_heat_flux_collision(
-            f_post, g_eq, f, g, macro_before.u, mapping, lattice, transport=transport)
-        f_post = _correct_f_conserved_moments(f_post, f, lattice)
-        macro_mid = recover_macro(f_post, g_shape, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
-        delta_G = macro_before.E_tot - macro_mid.E_tot
-        # 在随体参考系交换平动/内部能量，避免额外的热流 -u*delta_G。
-        energy_weights = f_eq / macro_before.rho[..., None]
-        g_post = g_shape + delta_G[..., None] * energy_weights
+        stress = _nonequilibrium_central_stress(f, f_eq, macro_before.u, lattice)
+        q_raw = central_energy_flux_lu(f, g, u=macro_before.u, lattice=lattice)
+        momentum = np.einsum('...a,ai->...i', f, lattice.c)
+        f_post, g_post = _reconstruct_collision(
+            macro_before, stress, q_raw, momentum, f_eq, g_eq, transport, mapping, lattice)
 
     if not return_diagnostics:
         return f_post, g_post

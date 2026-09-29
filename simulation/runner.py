@@ -42,6 +42,7 @@ def _summary(data, config, previous=None):
             difference_percent=100*(result['air'][key]/value-1))
             for key,value in config.get('case',{}).get('paper_air',{}).items()}
     result.update(mapping=mapping.to_metadata(),steps=len(data['t_s']),
+        state_representation=config['numerics'].get('state_representation','populations'),
         actual_length_m=config['numerics']['ny']*mapping.lattice.dx_m,
         validation_passed=bool(result['pass_reflection'] if run['mode'] in ('pulse','interface_pulse') else all(result['gates'].values())))
     if synchronized_run(run):
@@ -50,6 +51,9 @@ def _summary(data, config, previous=None):
             warmup_s=float(data['warmup_s']),advance_s=float(data['advance_s']),
             mass_lu_definition='SI areal mass / (rho_scale * finest dx)',
             grid=config.get('grid',{'type':'uniform'}),comparison_passed=None)
+        if 'state_storage_bytes' in data:
+            result.update(state_storage_bytes=int(data['state_storage_bytes']),
+                representation_equivalence_only=bool(data['representation_equivalence_only']))
         if bool(data.get('interface_exchange_available',False)):
             result['max_interface_cancellation_SI']=np.max(abs(data['interface_exchange'][:,2,:]),axis=0).tolist()
     return result
@@ -79,6 +83,7 @@ def run_case(effective, output, *, source_cache=None, provenance=None):
         audit_columns=['wall_mass_lu','top_mass_lu','wall_energy_J_m2','top_energy_J_m2',
             'mass_residual_lu','energy_residual_J_m2'])
     manifest['collision_backend'] = config['numerics'].get('collision_backend', 'numpy')
+    manifest['state_representation'] = config['numerics'].get('state_representation','populations')
     if manifest['collision_backend'] == 'numba':
         manifest.update(numba=version('numba'), llvmlite=version('llvmlite'))
     if run['mode']=='power':
@@ -96,6 +101,9 @@ def run_case(effective, output, *, source_cache=None, provenance=None):
         if 'grid' in config:
             from core.two_level_planar_solver import TwoLevelPlanarOpenSolver
             solver=TwoLevelPlanarOpenSolver(config)
+        elif manifest['state_representation']=='moments9':
+            from core.moment_planar_solver import MomentPlanarOpenSolver
+            solver=MomentPlanarOpenSolver(config)
         else:
             solver=PlanarOpenSolver(config)
         print(f"{config['case']['name']}: {run['mode']}, ny={solver.ny}, dx={solver.mapping.lattice.dx_m:g}",flush=True)

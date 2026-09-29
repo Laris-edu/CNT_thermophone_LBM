@@ -28,31 +28,18 @@ def _correct_mass_momentum(fp, c, w, rho, px, py, denom_x, denom_y):
 
 
 @njit(cache=True, fastmath=False, nogil=True, error_model='numpy')
-def _collide_cells(f, g, fe, ge, rho, u, energy, tau21, tau22, retention,
+def _collide_cells(stress, q_raw, momentum, fe, ge, rho, u, energy, tau21, tau22, retention,
                    c, w, second, heat, first, trace_scale, f_fraction):
-    cells, q = f.shape
-    result_f, result_g = np.empty_like(f), np.empty_like(g)
+    cells, q = fe.shape
+    result_f, result_g = np.empty_like(fe), np.empty_like(ge)
     denom_x = denom_y = 0.
     for a in range(q):
         denom_x += w[a]*c[a, 0]*c[a, 0]
         denom_y += w[a]*c[a, 1]*c[a, 1]
     for cell in range(cells):
         ux, uy = u[cell, 0], u[cell, 1]
-        xx = xy = yy = px = py = 0.
-        qfx = qfy = qgx = qgy = 0.
-        for a in range(q):
-            x, y = c[a, 0]-ux, c[a, 1]-uy
-            speed2 = x*x+y*y
-            neq = f[cell, a]-fe[cell, a]
-            xx += neq*x*x
-            xy += neq*x*y
-            yy += neq*y*y
-            px += f[cell, a]*c[a, 0]
-            py += f[cell, a]*c[a, 1]
-            qfx += f[cell, a]*speed2*x
-            qfy += f[cell, a]*speed2*y
-            qgx += g[cell, a]*x
-            qgy += g[cell, a]*y
+        xx, xy, yy = stress[cell, 0], stress[cell, 1], stress[cell, 2]
+        px, py = momentum[cell, 0], momentum[cell, 1]
         trace = trace_scale*(1.-1./tau22[cell])*(xx+yy)
         dev = (1.-1./tau21[cell])*(xx-yy)
         shear = (1.-1./tau21[cell])*xy
@@ -70,8 +57,8 @@ def _collide_cells(f, g, fe, ge, rho, u, energy, tau21, tau22, retention,
             present_fy += fp[a]*speed2*y
             present_gx += ge[cell, a]*x
             present_gy += ge[cell, a]*y
-        target_x = retention[cell]*(.5*qfx+qgx)
-        target_y = retention[cell]*(.5*qfy+qgy)
+        target_x = retention[cell]*q_raw[cell, 0]
+        target_y = retention[cell]*q_raw[cell, 1]
         dfx = f_fraction*target_x-.5*present_fx
         dfy = f_fraction*target_y-.5*present_fy
         dgx = (1.-f_fraction)*target_x-present_gx
@@ -100,15 +87,55 @@ def _collide_cells(f, g, fe, ge, rho, u, energy, tau21, tau22, retention,
     return result_f, result_g
 
 
+@njit(cache=True, fastmath=False, nogil=True)
+def _measure_cells(f, g, fe, u, c):
+    cells, q = f.shape
+    stress = np.empty((cells, 3))
+    q_raw = np.empty((cells, 2))
+    momentum = np.empty((cells, 2))
+    for cell in range(cells):
+        ux, uy = u[cell, 0], u[cell, 1]
+        xx = xy = yy = px = py = 0.
+        qfx = qfy = qgx = qgy = 0.
+        for a in range(q):
+            x, y = c[a, 0]-ux, c[a, 1]-uy
+            speed2 = x*x+y*y
+            neq = f[cell, a]-fe[cell, a]
+            xx += neq*x*x
+            xy += neq*x*y
+            yy += neq*y*y
+            px += f[cell, a]*c[a, 0]
+            py += f[cell, a]*c[a, 1]
+            qfx += f[cell, a]*speed2*x
+            qfy += f[cell, a]*speed2*y
+            qgx += g[cell, a]*x
+            qgy += g[cell, a]*y
+        stress[cell, 0], stress[cell, 1], stress[cell, 2] = xx, xy, yy
+        q_raw[cell, 0], q_raw[cell, 1] = .5*qfx+qgx, .5*qfy+qgy
+        momentum[cell, 0], momentum[cell, 1] = px, py
+    return stress, q_raw, momentum
+
+
 def collide_prepared(f, g, fe, ge, macro, transport, mapping, lattice, projectors):
     """Adapt public arrays to the compiled arithmetic, without changing inputs."""
     if f.shape != g.shape or f.ndim < 1 or f.shape[-1] != 37:
         raise ValueError('compiled D2Q37 collision requires equal f/g shapes ending in 37')
+    populations = lambda values: np.ascontiguousarray(values).reshape(-1, 37)
+    measured = _measure_cells(populations(f), populations(g), populations(fe),
+        np.ascontiguousarray(macro.u).reshape(-1, 2), lattice.c)
+    return collide_measured(*measured, fe, ge, macro, transport, mapping, lattice, projectors)
+
+
+def collide_measured(stress, q_raw, momentum, fe, ge, macro, transport, mapping, lattice, projectors):
+    """Common compiled reconstruction, accepting measured stress xx,xy,yy."""
     flat = lambda values: np.ascontiguousarray(values).reshape(-1)
     populations = lambda values: np.ascontiguousarray(values).reshape(-1, 37)
-    fp, gp = _collide_cells(populations(f), populations(g), populations(fe), populations(ge),
+    fp, gp = _collide_cells(
+        np.ascontiguousarray(stress).reshape(-1, 3),
+        np.ascontiguousarray(q_raw).reshape(-1, 2),
+        np.ascontiguousarray(momentum).reshape(-1, 2), populations(fe), populations(ge),
         flat(macro.rho), np.ascontiguousarray(macro.u).reshape(-1, 2), flat(macro.E_tot),
         flat(transport.tau21), flat(transport.tau22), flat(transport.heat_flux_retention),
         lattice.c, lattice.w, *projectors, mapping.collision.trace_bulk_scale,
         mapping.collision.regularized_heat_flux_f_fraction)
-    return fp.reshape(f.shape), gp.reshape(g.shape)
+    return fp.reshape(fe.shape), gp.reshape(ge.shape)

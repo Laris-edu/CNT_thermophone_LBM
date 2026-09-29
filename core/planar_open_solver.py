@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from copy import deepcopy
 import numpy as np
 
 from boundary.planar_open import PreparedDiffuseWall, characteristic_top, crossing_totals, crossing_moments
@@ -39,6 +40,35 @@ class PlanarOpenSolver(GasSolver2D):
         c2 = np.sum(self.lattice.c**2, axis=1)
         return float(np.sum(f)/self.nx), float(np.sum(.5*f*c2+g)/self.nx)
 
+    def _state_totals(self):
+        return self._totals(*self._require_state())
+
+    def _collide_state(self):
+        return collide_fg(*self._require_state(), self.mapping,
+                          lattice=self.lattice, backend=self.collision_backend)
+
+    def _commit_state(self, f, g):
+        self.f, self.g = f, g
+
+    def population_extrema(self):
+        return tuple(float(np.min(v)) for v in self._require_state())
+
+    def warmup_collision(self):
+        f, g = self._require_state()
+        collide_fg(f[:3], g[:3], self.mapping, lattice=self.lattice, backend=self.collision_backend)
+
+    def checkpoint(self):
+        """Owned snapshot for a synchronized pair of open-domain steps."""
+        f, g = self._require_state()
+        return dict(f=f.copy(), g=g.copy(), t_lu=self.t_lu,
+                    last_audit=self.last_audit, last_interface_audit=deepcopy(self.last_interface_audit))
+
+    def restore(self, checkpoint):
+        self.f, self.g = checkpoint['f'].copy(), checkpoint['g'].copy()
+        self.t_lu = checkpoint['t_lu']
+        self.last_audit = checkpoint['last_audit']
+        self.last_interface_audit = deepcopy(checkpoint['last_interface_audit'])
+
     def step(self, n_steps=1, boundary_callback=None):
         raise TypeError("use step_temperature(temperature_K); no film ODE or periodic callback")
 
@@ -53,9 +83,8 @@ class PlanarOpenSolver(GasSolver2D):
         without writing the streamed state. Commit once, after the callback and all
         boundary checks succeed. The gas layer has no knowledge of a film ODE.
         """
-        f, g = self._require_state()
-        mass0, energy0 = self._totals(f, g)
-        fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice, backend=self.collision_backend)
+        mass0, energy0 = self._state_totals()
+        fp, gp = self._collide_state()
         fn = pull_stream_open_y(fp, lattice=self.lattice)
         gn = pull_stream_open_y(gp, lattice=self.lattice)
         scale = self.mapping.pressure_scale * self.mapping.lattice.dx_m
@@ -92,11 +121,12 @@ class PlanarOpenSolver(GasSolver2D):
                                               m.rho_scale*m.velocity_scale,m.pressure_scale])
             interface = np.array([lower,upper,lower+upper])*units
         mass1, energy1 = self._totals(fn, gn)
-        self.last_audit = OpenStepAudit(float(wall[0]), float(outlet[0]),
+        audit = OpenStepAudit(float(wall[0]), float(outlet[0]),
             float(wall[1]*scale), float(outlet[1]*scale),
             float(mass1-mass0-wall[0]-outlet[0]),
             float((energy1-energy0-wall[1]-outlet[1])*scale))
-        self.f, self.g = fn, gn
+        self._commit_state(fn, gn)
+        self.last_audit = audit
         self.last_interface_audit = interface
         self.t_lu += 1
         return self.last_audit
