@@ -1,0 +1,602 @@
+{
+  "scope": "Read-only baseline audit plus explicitly requested short interface experiment",
+  "saved_comparison": {
+    "path": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260927_baseline\\final\\comparison.json",
+    "comparison_passed": false,
+    "step": {
+      "max_temperature_error_over_wall_increment": 0.005618406582357238,
+      "wall_energy_J_m2": [
+        0.0013921307774868233,
+        0.0013918372204342472
+      ],
+      "interface_energy_into_upper_J_m2": [
+        0.0013836765161191291,
+        0.0013833786280020904
+      ],
+      "wall_cumulative_relative_error": 0.00021091335126421917,
+      "interface_cumulative_relative_error": 0.00021533375679583244,
+      "conductive_moment_relative_l2": 0.026220709196554066,
+      "conductive_moment_normalized_max_error": 0.06672241484987551,
+      "conductive_moment_localization": {
+        "width_weighted_snapshot_l2": 0.031144955638425016,
+        "strip_halfwidth_m": 3.917625e-06,
+        "squared_error_fraction_in_strip": 0.9635826795645708,
+        "max_error_outside_strip_W_m2": 1.42558339255147,
+        "peak_time_s": 5e-06,
+        "peak_z_m": 1.991459375e-05,
+        "peak_two_level_W_m2": 74.31572607090713,
+        "peak_uniform_W_m2": 57.93040007290492,
+        "peak_relative_to_local_reference": 0.2828450343408886
+      },
+      "gates": {
+        "temperature": true,
+        "wall_energy": true,
+        "interface_energy": true,
+        "conductive_moment": false
+      },
+      "comparison_passed": false,
+      "validation_passed": {
+        "two_level": true,
+        "uniform": true
+      },
+      "status": {
+        "two_level": "completed",
+        "uniform": "completed"
+      },
+      "git_commit": "01a717b987ac4aaeb793617600e903654d605b71",
+      "performance": {
+        "cell_updates": [
+          1094016,
+          4118016
+        ],
+        "ideal_update_speedup": 3.764127764127764,
+        "warmup_s": [
+          0.0005964000010862947,
+          0.00024449999909847975
+        ],
+        "advance_s": [
+          5.203270699970744,
+          12.40219230006187
+        ],
+        "total_s": [
+          6.887146799999755,
+          15.414326499998424
+        ],
+        "advance_speedup": 2.3835377813673237,
+        "total_speedup": 2.2381295110478803
+      }
+    }
+  },
+  "baseline": {
+    "batch": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260927_baseline",
+    "saved_case_provenance": [
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260927_baseline\\raw\\step_two_level",
+        "git_commit": "01a717b987ac4aaeb793617600e903654d605b71",
+        "source_id": "3681024f1608396749897a060e2768da6ea5016101ee74506463fcdf39695521",
+        "git_dirty": false,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      },
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260927_baseline\\raw\\step_uniform",
+        "git_commit": "01a717b987ac4aaeb793617600e903654d605b71",
+        "source_id": "3681024f1608396749897a060e2768da6ea5016101ee74506463fcdf39695521",
+        "git_dirty": false,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      }
+    ],
+    "metrics": {
+      "max_temperature_error_over_wall_increment": 0.005618406582357238,
+      "wall_energy_J_m2": [
+        0.0013921307774868233,
+        0.0013918372204342472
+      ],
+      "interface_energy_into_upper_J_m2": [
+        0.0013836765161191291,
+        0.0013833786280020904
+      ],
+      "wall_cumulative_relative_error": 0.00021091335126421917,
+      "interface_cumulative_relative_error": 0.00021533375679583244,
+      "conductive_moment_relative_l2": 0.026220709196554066,
+      "conductive_moment_normalized_max_error": 0.06672241484987551,
+      "conductive_moment_localization": {
+        "width_weighted_snapshot_l2": 0.031144955638425016,
+        "strip_halfwidth_m": 3.917625e-06,
+        "squared_error_fraction_in_strip": 0.9635826795645708,
+        "max_error_outside_strip_W_m2": 1.42558339255147,
+        "peak_time_s": 5e-06,
+        "peak_z_m": 1.991459375e-05,
+        "peak_two_level_W_m2": 74.31572607090713,
+        "peak_uniform_W_m2": 57.93040007290492,
+        "peak_relative_to_local_reference": 0.2828450343408886
+      },
+      "gates": {
+        "temperature": true,
+        "wall_energy": true,
+        "interface_energy": true,
+        "conductive_moment": false
+      }
+    },
+    "peak": {
+      "snapshot_index": 4,
+      "time_s": 5e-06,
+      "two_level": {
+        "level": 0,
+        "row_zero_based": 30,
+        "z_m": 1.991459375e-05,
+        "density_kg_m3": 1.1599319168742213,
+        "temperature_K": 300.0180432653172,
+        "tau32": 0.6412443517999092,
+        "local_readout_factor": 0.22026603650145282,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 74.31572607090713,
+        "reconstructed_raw_central_moment_lu": 6.724849704550263e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "nearest_uniform": {
+        "level": 0,
+        "row_zero_based": 30,
+        "z_m": 1.991459375e-05,
+        "density_kg_m3": 1.1599299983921103,
+        "temperature_K": 300.01860510597544,
+        "tau32": 0.6412445570308068,
+        "local_readout_factor": 0.22026628605600962,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 57.93040007290492,
+        "reconstructed_raw_central_moment_lu": 5.242131282808329e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "exactly_same_position": true,
+      "nearest_position_difference_m": 0.0,
+      "fine_cell_count": 32,
+      "fine_rows_after_peak": 1,
+      "comparison_uniform_q_W_m2": 57.93040007290492,
+      "signed_difference_W_m2": 16.38532599800221,
+      "normalization_reference_global_max_W_m2": 245.57453495753956
+    },
+    "peak_time_interface_neighborhood": [
+      {
+        "row_zero_based": 26,
+        "level": 0,
+        "z_m": 1.730284375e-05,
+        "two_level_q_W_m2": 72.67601296241673,
+        "interpolated_uniform_q_W_m2": 71.83988218846648
+      },
+      {
+        "row_zero_based": 27,
+        "level": 0,
+        "z_m": 1.795578125e-05,
+        "two_level_q_W_m2": 69.61472075668003,
+        "interpolated_uniform_q_W_m2": 68.27017985027159
+      },
+      {
+        "row_zero_based": 28,
+        "level": 0,
+        "z_m": 1.860871875e-05,
+        "two_level_q_W_m2": 66.94032516112094,
+        "interpolated_uniform_q_W_m2": 64.75547126469516
+      },
+      {
+        "row_zero_based": 29,
+        "level": 0,
+        "z_m": 1.926165625e-05,
+        "two_level_q_W_m2": 65.4766449697165,
+        "interpolated_uniform_q_W_m2": 61.30581804334673
+      },
+      {
+        "row_zero_based": 30,
+        "level": 0,
+        "z_m": 1.991459375e-05,
+        "two_level_q_W_m2": 74.31572607090713,
+        "interpolated_uniform_q_W_m2": 57.93040007290492
+      },
+      {
+        "row_zero_based": 31,
+        "level": 0,
+        "z_m": 2.056753125e-05,
+        "two_level_q_W_m2": 58.26906451796165,
+        "interpolated_uniform_q_W_m2": 54.63749504802314
+      },
+      {
+        "row_zero_based": 32,
+        "level": 1,
+        "z_m": 2.15469375e-05,
+        "two_level_q_W_m2": 35.30169150836341,
+        "interpolated_uniform_q_W_m2": 49.88111671422894
+      },
+      {
+        "row_zero_based": 33,
+        "level": 1,
+        "z_m": 2.28528125e-05,
+        "two_level_q_W_m2": 42.194985150152384,
+        "interpolated_uniform_q_W_m2": 43.873768370533085
+      },
+      {
+        "row_zero_based": 34,
+        "level": 1,
+        "z_m": 2.41586875e-05,
+        "two_level_q_W_m2": 39.06971703171977,
+        "interpolated_uniform_q_W_m2": 38.299146169368996
+      },
+      {
+        "row_zero_based": 35,
+        "level": 1,
+        "z_m": 2.54645625e-05,
+        "two_level_q_W_m2": 34.585714360505264,
+        "interpolated_uniform_q_W_m2": 33.180792355042605
+      }
+    ],
+    "snapshot_times_s": [
+      0.0,
+      1.5625e-06,
+      3.125e-06,
+      4.6875000000000004e-06,
+      5e-06
+    ],
+    "limitations": [
+      "Maximum covers saved snapshots, not every synchronized step.",
+      "Reconstructed raw moments do not independently validate saved q or collision.",
+      "Conservation and temperature agreement do not establish local conductive-moment accuracy.",
+      "Interface-localized evidence alone cannot distinguish algorithmic truncation from an implementation defect."
+    ]
+  },
+  "diagnosis": "Peak coordinate, mapping and localization evidence; no threshold or population modification.",
+  "step_refinement": {
+    "batch": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\_work\\20260927_step_refine8",
+    "saved_case_provenance": [
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\_work\\20260927_step_refine8\\raw\\step_two_level",
+        "git_commit": "01a717b987ac4aaeb793617600e903654d605b71",
+        "source_id": "3681024f1608396749897a060e2768da6ea5016101ee74506463fcdf39695521",
+        "git_dirty": true,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      },
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\_work\\20260927_step_refine8\\raw\\step_uniform",
+        "git_commit": "01a717b987ac4aaeb793617600e903654d605b71",
+        "source_id": "3681024f1608396749897a060e2768da6ea5016101ee74506463fcdf39695521",
+        "git_dirty": true,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      }
+    ],
+    "metrics": {
+      "max_temperature_error_over_wall_increment": 0.0019593209015056345,
+      "wall_energy_J_m2": [
+        0.001380701625539183,
+        0.0013806123371057533
+      ],
+      "interface_energy_into_upper_J_m2": [
+        0.0013722719741705073,
+        0.0013721790711607074
+      ],
+      "wall_cumulative_relative_error": 6.467306645752124e-05,
+      "interface_cumulative_relative_error": 6.770472728545585e-05,
+      "conductive_moment_relative_l2": 0.013473559211453023,
+      "conductive_moment_normalized_max_error": 0.05040867383984632,
+      "conductive_moment_localization": {
+        "width_weighted_snapshot_l2": 0.015753701399563454,
+        "strip_halfwidth_m": 1.9588125e-06,
+        "squared_error_fraction_in_strip": 0.988330045006056,
+        "max_error_outside_strip_W_m2": 0.5430257866591077,
+        "peak_time_s": 5e-06,
+        "peak_z_m": 2.0404296875e-05,
+        "peak_two_level_W_m2": 67.482095527343,
+        "peak_uniform_W_m2": 54.91772651213742,
+        "peak_relative_to_local_reference": 0.22878530873685607
+      },
+      "gates": {
+        "temperature": true,
+        "wall_energy": true,
+        "interface_energy": true,
+        "conductive_moment": false
+      }
+    },
+    "peak": {
+      "snapshot_index": 4,
+      "time_s": 5e-06,
+      "two_level": {
+        "level": 0,
+        "row_zero_based": 62,
+        "z_m": 2.0404296875e-05,
+        "density_kg_m3": 1.1599354481926298,
+        "temperature_K": 300.0171390412353,
+        "tau32": 0.7824879349440488,
+        "local_readout_factor": 0.36101251192358363,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 67.482095527343,
+        "reconstructed_raw_central_moment_lu": 3.7257670787048044e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "nearest_uniform": {
+        "level": 0,
+        "row_zero_based": 62,
+        "z_m": 2.0404296875e-05,
+        "density_kg_m3": 1.1599348665391382,
+        "temperature_K": 300.01733497332543,
+        "tau32": 0.7824880568032546,
+        "local_readout_factor": 0.36101261143501673,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 54.91772651213742,
+        "reconstructed_raw_central_moment_lu": 3.0320724256904796e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "exactly_same_position": true,
+      "nearest_position_difference_m": 0.0,
+      "fine_cell_count": 64,
+      "fine_rows_after_peak": 1,
+      "comparison_uniform_q_W_m2": 54.91772651213742,
+      "signed_difference_W_m2": 12.564369015205585,
+      "normalization_reference_global_max_W_m2": 249.25014006763823
+    },
+    "peak_time_interface_neighborhood": [
+      {
+        "row_zero_based": 58,
+        "level": 0,
+        "z_m": 1.9098421875e-05,
+        "two_level_q_W_m2": 61.85433889741596,
+        "interpolated_uniform_q_W_m2": 61.602804829276145
+      },
+      {
+        "row_zero_based": 59,
+        "level": 0,
+        "z_m": 1.9424890625e-05,
+        "two_level_q_W_m2": 60.35617139564308,
+        "interpolated_uniform_q_W_m2": 59.90123353605718
+      },
+      {
+        "row_zero_based": 60,
+        "level": 0,
+        "z_m": 1.9751359375000002e-05,
+        "two_level_q_W_m2": 58.28198767786831,
+        "interpolated_uniform_q_W_m2": 58.21919608445864
+      },
+      {
+        "row_zero_based": 61,
+        "level": 0,
+        "z_m": 2.0077828125e-05,
+        "two_level_q_W_m2": 57.81179842534166,
+        "interpolated_uniform_q_W_m2": 56.557707755375034
+      },
+      {
+        "row_zero_based": 62,
+        "level": 0,
+        "z_m": 2.0404296875e-05,
+        "two_level_q_W_m2": 67.482095527343,
+        "interpolated_uniform_q_W_m2": 54.91772651213742
+      },
+      {
+        "row_zero_based": 63,
+        "level": 0,
+        "z_m": 2.0730765625e-05,
+        "two_level_q_W_m2": 57.48986099063592,
+        "interpolated_uniform_q_W_m2": 53.30015278063672
+      },
+      {
+        "row_zero_based": 64,
+        "level": 1,
+        "z_m": 2.122046875e-05,
+        "two_level_q_W_m2": 40.576457104412746,
+        "interpolated_uniform_q_W_m2": 50.9206857132203
+      },
+      {
+        "row_zero_based": 65,
+        "level": 1,
+        "z_m": 2.1873406250000002e-05,
+        "two_level_q_W_m2": 47.4131760454634,
+        "interpolated_uniform_q_W_m2": 47.82997503850394
+      },
+      {
+        "row_zero_based": 66,
+        "level": 1,
+        "z_m": 2.252634375e-05,
+        "two_level_q_W_m2": 45.498631879801366,
+        "interpolated_uniform_q_W_m2": 44.84218237337959
+      },
+      {
+        "row_zero_based": 67,
+        "level": 1,
+        "z_m": 2.317928125e-05,
+        "two_level_q_W_m2": 42.501141497076524,
+        "interpolated_uniform_q_W_m2": 41.961788175869074
+      }
+    ],
+    "snapshot_times_s": [
+      0.0,
+      1.5625e-06,
+      3.125e-06,
+      4.6875000000000004e-06,
+      5e-06
+    ],
+    "limitations": [
+      "Maximum covers saved snapshots, not every synchronized step.",
+      "Reconstructed raw moments do not independently validate saved q or collision.",
+      "Conservation and temperature agreement do not establish local conductive-moment accuracy.",
+      "Interface-localized evidence alone cannot distinguish algorithmic truncation from an implementation defect."
+    ]
+  },
+  "moved_interface": {
+    "batch": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260929_interface_audit",
+    "saved_case_provenance": [
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260929_interface_audit\\raw\\step_two_level",
+        "git_commit": "15bf6562e395cfe47430d24976fcf08535087af5",
+        "source_id": "ef1fec9d4832bc2e6072349c0deb3bfa8da9fa4a80803a853627581838b288f8",
+        "git_dirty": true,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      },
+      {
+        "case": "E:\\CNT_thermophone_LBM\\Compute\\multi_grid\\20260929_interface_audit\\raw\\step_uniform",
+        "git_commit": "15bf6562e395cfe47430d24976fcf08535087af5",
+        "source_id": "ef1fec9d4832bc2e6072349c0deb3bfa8da9fa4a80803a853627581838b288f8",
+        "git_dirty": true,
+        "source_clean": true,
+        "status": "completed",
+        "validation_passed": true
+      }
+    ],
+    "metrics": {
+      "max_temperature_error_over_wall_increment": 0.0031673175101332163,
+      "wall_energy_J_m2": [
+        0.0013918641370365516,
+        0.0013918372204342472
+      ],
+      "interface_energy_into_upper_J_m2": [
+        0.0013812500692904008,
+        0.0013812141240671751
+      ],
+      "wall_cumulative_relative_error": 1.9338901064980263e-05,
+      "interface_cumulative_relative_error": 2.6024366967636325e-05,
+      "conductive_moment_relative_l2": 0.014202969513125779,
+      "conductive_moment_normalized_max_error": 0.03839983903349429,
+      "conductive_moment_localization": {
+        "width_weighted_snapshot_l2": 0.0170138773006086,
+        "strip_halfwidth_m": 3.917625e-06,
+        "squared_error_fraction_in_strip": 0.933773280833508,
+        "max_error_outside_strip_W_m2": 1.1658754778472158,
+        "peak_time_s": 5e-06,
+        "peak_z_m": 2.513809375e-05,
+        "peak_two_level_W_m2": 43.83223904094207,
+        "peak_uniform_W_m2": 34.402216427847335,
+        "peak_relative_to_local_reference": 0.2741109030830199
+      },
+      "gates": {
+        "temperature": true,
+        "wall_energy": true,
+        "interface_energy": true,
+        "conductive_moment": true
+      }
+    },
+    "peak": {
+      "snapshot_index": 4,
+      "time_s": 5e-06,
+      "two_level": {
+        "level": 0,
+        "row_zero_based": 38,
+        "z_m": 2.513809375e-05,
+        "density_kg_m3": 1.1599660850551146,
+        "temperature_K": 300.0092311793467,
+        "tau32": 0.6412406364122204,
+        "local_readout_factor": 0.2202615186749084,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 43.83223904094207,
+        "reconstructed_raw_central_moment_lu": 3.966472257424351e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "nearest_uniform": {
+        "level": 0,
+        "row_zero_based": 38,
+        "z_m": 2.513809375e-05,
+        "density_kg_m3": 1.1599650063090967,
+        "temperature_K": 300.00954791109774,
+        "tau32": 0.641240751764288,
+        "local_readout_factor": 0.22026165894117455,
+        "heat_flux_scale": 50170751.40831057,
+        "physical_q_W_m2": 34.402216427847335,
+        "reconstructed_raw_central_moment_lu": 3.11312753223554e-06,
+        "raw_moment_evidence": "inverse of saved physical q using public local mapping; populations unavailable"
+      },
+      "exactly_same_position": true,
+      "nearest_position_difference_m": 0.0,
+      "fine_cell_count": 40,
+      "fine_rows_after_peak": 1,
+      "comparison_uniform_q_W_m2": 34.402216427847335,
+      "signed_difference_W_m2": 9.430022613094735,
+      "normalization_reference_global_max_W_m2": 245.57453495753956
+    },
+    "peak_time_interface_neighborhood": [
+      {
+        "row_zero_based": 34,
+        "level": 0,
+        "z_m": 2.252634375e-05,
+        "two_level_q_W_m2": 45.87957593214441,
+        "interpolated_uniform_q_W_m2": 45.32293067284372
+      },
+      {
+        "row_zero_based": 35,
+        "level": 0,
+        "z_m": 2.317928125e-05,
+        "two_level_q_W_m2": 43.28653599900144,
+        "interpolated_uniform_q_W_m2": 42.424606068222445
+      },
+      {
+        "row_zero_based": 36,
+        "level": 0,
+        "z_m": 2.383221875e-05,
+        "two_level_q_W_m2": 40.99125614473469,
+        "interpolated_uniform_q_W_m2": 39.636563504579435
+      },
+      {
+        "row_zero_based": 37,
+        "level": 0,
+        "z_m": 2.448515625e-05,
+        "two_level_q_W_m2": 39.48233701421292,
+        "interpolated_uniform_q_W_m2": 36.96172883415854
+      },
+      {
+        "row_zero_based": 38,
+        "level": 0,
+        "z_m": 2.513809375e-05,
+        "two_level_q_W_m2": 43.83223904094207,
+        "interpolated_uniform_q_W_m2": 34.402216427847335
+      },
+      {
+        "row_zero_based": 39,
+        "level": 0,
+        "z_m": 2.579103125e-05,
+        "two_level_q_W_m2": 34.13195303404886,
+        "interpolated_uniform_q_W_m2": 31.95936828223787
+      },
+      {
+        "row_zero_based": 40,
+        "level": 1,
+        "z_m": 2.67704375e-05,
+        "two_level_q_W_m2": 20.064250502069466,
+        "interpolated_uniform_q_W_m2": 28.52961619994018
+      },
+      {
+        "row_zero_based": 41,
+        "level": 1,
+        "z_m": 2.8076312500000002e-05,
+        "two_level_q_W_m2": 23.568657529895106,
+        "interpolated_uniform_q_W_m2": 24.34526528423146
+      },
+      {
+        "row_zero_based": 42,
+        "level": 1,
+        "z_m": 2.93821875e-05,
+        "two_level_q_W_m2": 21.22648198499458,
+        "interpolated_uniform_q_W_m2": 20.61770217021499
+      },
+      {
+        "row_zero_based": 43,
+        "level": 1,
+        "z_m": 3.06880625e-05,
+        "two_level_q_W_m2": 18.263522726434,
+        "interpolated_uniform_q_W_m2": 17.32889248137023
+      }
+    ],
+    "snapshot_times_s": [
+      0.0,
+      1.5625e-06,
+      3.125e-06,
+      4.6875000000000004e-06,
+      5e-06
+    ],
+    "limitations": [
+      "Maximum covers saved snapshots, not every synchronized step.",
+      "Reconstructed raw moments do not independently validate saved q or collision.",
+      "Conservation and temperature agreement do not establish local conductive-moment accuracy.",
+      "Interface-localized evidence alone cannot distinguish algorithmic truncation from an implementation defect."
+    ]
+  }
+}
