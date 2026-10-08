@@ -10,13 +10,9 @@ results/
 .vscode/
 Paper/
 X/
-# _work/ holds throwaway diagnostics; keep the batch's final/ and raw/ only.
+# _work/ holds throwaway diagnostics.
 _work/
-# Over GitHub's 100 MB per-file limit: keep these trajectories local,
-# effective.yaml + manifest.json still record how to regenerate them.
-Compute/open_planar/20260921_e1/raw/e1_power_f20000_r4/trajectory.npz
-Compute/open_planar/20260921_e1_long100/raw/e1_power_f20000_r4_c100_cold/trajectory.npz
-Compute/open_planar/20260922_e1_long500/raw/e1_power_f20000_r4_c500_cold/trajectory.npz
-Compute/open_planar/20260923_e1_r2_c20/raw/e1_power_f20000_r2_c20_cold/trajectory.npz
-Compute/lbm_acoustic_handoff/20260924_time_convergence/raw/thermal_f50000_r4_h1mm_c20/trajectory.npz
-Compute/multi_grid/20260927_baseline/raw/power_two_level/trajectory.npz
+# Run outputs (raw/ and final/) stay local; topic-level scripts and study
+# configs remain tracked so every case stays reproducible.
+Compute/**/raw/
+Compute/**/final/
