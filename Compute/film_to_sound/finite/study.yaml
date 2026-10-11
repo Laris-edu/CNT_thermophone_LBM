@@ -1,0 +1,30 @@
+# Uniform, in-phase 30 x 30 mm freely suspended film; no acoustic baffle.
+# Reuse the committed r2 thermal-acoustic result, without advancing LBM.
+source_batch: ../20261011_r2
+batch_name: 20261011_square30mm_45mm
+toolbox_path: ../../../k-wave-toolbox-version-1.4.1
+matlab_executable: E:/Matlab/bin/matlab.exe
+film:
+  width_m: 0.030
+  height_m: 0.030
+  radiation: free_space_symmetric_monopole_sheet
+  amplitude_profile: uniform
+  phase_profile: uniform
+handoff_nominal_m: 0.00020
+target_m: 0.045
+medium: homogeneous_lossless
+cases:
+  - {name: plane_check, dx_m: 0.00075, evaluation_cycles: 7.25, grid_expansion_factor: 1.1}
+  - {name: finite_coarse, dx_m: 0.001, evaluation_cycles: 7, grid_expansion_factor: 1.1}
+  - {name: finite_fine, dx_m: 0.00075, evaluation_cycles: 7, grid_expansion_factor: 1.1}
+  - {name: finite_time, dx_m: 0.00075, evaluation_cycles: 9.25, grid_expansion_factor: 1.1}
+  - {name: finite_padding, dx_m: 0.00075, evaluation_cycles: 7, grid_expansion_factor: 1.3}
+validation:
+  amplitude_percent: 1.0
+  phase_deg: 1.0
+  minimum_axial_distance_m: 0.006
+  quadrature_orders: [48, 80]
+# Effective source: p_s = p_plus(z_h) exp(+i k z_h), not actual film pressure.
+# Total two-sided volume injection per area = 2 p_s / (rho0 c0).
+# k-Wave mass-source normalization already includes two-sided radiation.
+# No edge heat transfer, supports, acoustic feedback, or air absorption.
