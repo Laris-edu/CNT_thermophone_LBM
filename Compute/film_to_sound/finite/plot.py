@@ -110,7 +110,8 @@ def field_figure(result, data):
                        label='Infinite-plane amplitude')
     axes[0, 1].set(xlabel='Height above film (mm)', ylabel='Pressure amplitude (Pa)',
                    xlim=(0, 45))
-    axes[0, 1].set_title('On-axis finite-aperture response', loc='left')
+    interval = f'{z[0]*1e3:g}–{z[-1]*1e3:g} mm'
+    axes[0, 1].set_title(f'On-axis response ({interval})', loc='left')
     axes[0, 1].legend(loc='upper center', bbox_to_anchor=(.5, 1.0), fontsize=7.5)
     ymax = max(float(abs(pressure)), np.max(abs(axis)), np.max(abs(reference)))
     axes[0, 1].set_ylim(0, ymax*1.38)
@@ -123,7 +124,7 @@ def field_figure(result, data):
     axes[1, 1].plot(z*1e3, phase_relative(reference, power), '--', color=ORANGE)
     axes[1, 1].set(xlabel='Height above film (mm)',
                    ylabel='Phase relative to input power (deg)', xlim=(0, 45))
-    axes[1, 1].set_title('Original-clock phase; no fitted offset', loc='left')
+    axes[1, 1].set_title(f'Original-clock phase ({interval})', loc='left')
     return fig, list(axes.flat)
 
 
@@ -143,7 +144,7 @@ def validation_figure(result, data):
     axes[0, 0].set(xlabel='Height above film (mm)', ylabel='Absolute difference / limit',
                    xlim=(float(z[0]*1e3), 45))
     axes[0, 0].set_title('k-Wave versus independent integral', loc='left')
-    axes[0, 0].legend(loc='upper right', fontsize=7.5)
+    axes[0, 0].legend(loc='upper right', bbox_to_anchor=(1, .82), fontsize=7.5)
     comparisons = result['metrics']['comparisons']
     index = np.arange(len(comparisons))
     for key, color, marker, label in (
@@ -152,10 +153,12 @@ def validation_figure(result, data):
         values = [abs(row[key]) for row in comparisons]
         axes[0, 1].plot(index, values, marker, color=color, ms=4, label=label)
     axes[0, 1].axhline(1, color=GREY, linestyle=':')
-    axes[0, 1].set_xticks(index, [row['label'].replace(' ', '\n') for row in comparisons])
+    labels = [('Axial grid' if row['label'] == 'Grid spacing' else row['label'])
+              .replace(' ', '\n') for row in comparisons]
+    axes[0, 1].set_xticks(index, labels)
     axes[0, 1].set_ylabel('Absolute difference / limit')
     axes[0, 1].set_title('Normalization and numerical sensitivity', loc='left')
-    axes[0, 1].legend(loc='upper right', fontsize=7.5)
+    axes[0, 1].legend(loc='upper right', bbox_to_anchor=(1, .82), fontsize=7.5)
     x_field, y_field, z_field = (np.asarray(data[k]) for k in ('x_m', 'y_m', 'z_m'))
     center = np.asarray(data['pressure_Pa'])[np.argmin(abs(x_field)), np.argmin(abs(y_field)), :]
     positive = np.flatnonzero(z_field > 0)
