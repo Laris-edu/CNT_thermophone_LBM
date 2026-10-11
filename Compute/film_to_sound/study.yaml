@@ -1,0 +1,35 @@
+# Local planar demonstration: power -> film -> actual wall exchange -> direct p.
+# The area converts total power to areal power; it does not define film edges.
+base_config: ../open_planar/e1_long_air.yaml
+defaults:
+  refine: 2
+  length_m: 0.001
+cases:
+  - name: pulse_r2
+    mode: pulse
+  - name: power_f20k_r2
+    mode: power
+    frequency_Hz: 20000.0  # Power/acoustic frequency; electrical frequency 10 kHz.
+    power:
+      mean_W: 1.13
+      area_m2: 0.0009
+    film:
+      C_A_J_m2K: 0.0007  # Assumed, not an experimental measurement.
+      G_W_m2K: 57.8     # Total additional leak across both sides.
+      gas_flux_factor: 2.0
+      T_ref_K: 300.0
+      initial_temperature_K: 300.0
+    cycles: 24
+    probes_m: [0.00012, 0.00016, 0.00020, 0.00030, 0.00060]
+    stopping:
+      first_diagnostic_cycle: 6
+      first_stable_cycle: 8
+      stop_when_stable: true
+    sampling:
+      profile_samples_per_cycle: 32
+
+# Run pulse_r2 first and inspect its reflection AND saved exchange residuals.
+# Propagation uses actual probe coordinates, exp(+i omega t), and mapping rho/c.
+# Sources: 0.12/0.16/0.20 mm; direct-pressure targets: 0.30/0.60 mm.
+# Preregistered limits: amplitude <=1%, phase <=1 degree, incoming/outgoing <=1%.
+# The 3 mm lossless planar extrapolation is outside the directly checked domain.
