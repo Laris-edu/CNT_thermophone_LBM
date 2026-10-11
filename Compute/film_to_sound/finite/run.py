@@ -90,8 +90,11 @@ def prepare(config_path):
         upstream_propagation_validation_passed=source_result['propagation_validation_passed'],
         upstream_raw_sha256=source_result['raw_sha256'])
     inputs = dict(frequency_Hz=frequency, c0_m_s=ph.c0_m_s, rho0_kg_m3=ph.rho0_kg_m3,
-        source_re=source_pressure.real, source_im=source_pressure.imag,
+        source_re=float(source_pressure.real), source_im=float(source_pressure.imag),
         width_m=film['width_m'], height_m=film['height_m'], toolbox_path=str(toolbox), cases=cfg['cases'])
+    # Check both exchange formats before creating any output directory.
+    yaml.safe_dump(dict(source=inputs, study=cfg), sort_keys=False)
+    json.dumps(dict(source=source, inputs=inputs), allow_nan=False)
     return cfg, source, inputs, toolbox
 
 

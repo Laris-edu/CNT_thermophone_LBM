@@ -1,7 +1,7 @@
 # Uniform, in-phase 30 x 30 mm freely suspended film; no acoustic baffle.
 # Reuse the committed r2 thermal-acoustic result, without advancing LBM.
 source_batch: ../20261011_r2
-batch_name: 20261011_square30mm_45mm
+batch_name: 20261011_square30mm_45mm_v2
 toolbox_path: ../../../k-wave-toolbox-version-1.4.1
 matlab_executable: E:/Matlab/bin/matlab.exe
 film:
