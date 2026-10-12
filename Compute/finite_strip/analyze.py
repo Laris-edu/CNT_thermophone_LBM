@@ -333,7 +333,8 @@ def analyze_saved(case_dir, boundary_path=None):
     try:
         if not manifest.get('source_id'):
             raise ValueError('raw simulation source identity is missing')
-        validate_boundary_evidence(boundary_path.parent.parent,effective,source_id=manifest['source_id'])
+        validate_boundary_evidence(boundary_path.parent.parent,effective,
+                                   source_id=manifest['source_id'],proof_path=boundary_path)
         binding=dict(passed=True)
     except (OSError,ValueError,KeyError) as exc:
         binding=dict(passed=False,reason=str(exc))

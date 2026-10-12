@@ -16,11 +16,12 @@ def _digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def validate_boundary_evidence(root,config,*,source_id=None):
+def validate_boundary_evidence(root,config,*,source_id=None,proof_path=None):
     """Bind the gate to actual saved pulses, absorber geometry and runtime."""
     from simulation.provenance import capture_source
     from simulation.study import ROOT
-    proof=json.loads((root/'final/boundary_validation.json').read_text())
+    proof_file=Path(proof_path) if proof_path is not None else root/'final/boundary_validation.json'
+    proof=json.loads(proof_file.read_text(encoding='utf-8'))
     if proof.get('boundary_validation_passed') is not True or proof.get('limit',1)>.01:
         raise ValueError('boundary validation has not passed the 1% gate')
     for label in ('combined','top','sides'):

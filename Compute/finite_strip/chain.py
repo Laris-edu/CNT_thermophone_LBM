@@ -50,6 +50,15 @@ def validate_propagation(source,result):
     t=np.atleast_1d(result['time_s']); signal=np.asarray(result['observer_pressure_Pa'])
     if signal.shape!=(len(x),len(t)):
         raise ValueError('propagation time series dimensions do not match observers')
+    if t.ndim!=1 or len(t)<32 or not np.isfinite(t).all() or np.any(np.diff(t)<=0):
+        raise ValueError('propagation time must be finite and strictly increasing')
+    cadence=float(np.median(np.diff(t)))
+    if not np.allclose(np.diff(t),cadence,rtol=1e-7,atol=1e-13):
+        raise ValueError('propagation time has missing or irregular samples')
+    # Endpoint samples of two periods span 2T-dt. Having enough points for
+    # two least-squares fits alone does not establish complete coverage.
+    if t[-1]-t[0]+cadence<2/frequency-1e-13:
+        raise ValueError('propagation time must cover two complete periods')
     # Independent two consecutive one-period fits catch residual ramp/PML
     # transients; keep the absolute source clock, with no phase correction.
     fitted=[]

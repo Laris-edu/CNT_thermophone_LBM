@@ -191,3 +191,39 @@ def test_failed_cli_preserves_diagnostics_and_raw_hashes_without_mat(tmp_path,ha
     assert not (final/'manufactured_only_kwave_input.mat').exists()
     with pytest.raises(FileExistsError):
         api.main(['--batch',str(tmp_path),'--case','manufactured_only','--export-kwave'])
+
+
+@pytest.mark.parametrize('custom_valid',[False,True])
+def test_custom_boundary_file_is_the_evidence_actually_bound(tmp_path,hankel_case,custom_valid):
+    """Default and selected proofs disagree; the selected proof must decide."""
+    from Compute.finite_strip.run import compare_batch
+    from verification.test_strip_boundary_gate import write_pulse
+    api=analysis_api()
+    data,config,summary,_,_=hankel_case
+    # Saved manufactured pulses only: these fixtures test provenance, not LBM.
+    for name,w,h in [('pulse_candidate_dx10um',.002,.0005),
+        ('pulse_reference_dx10um',.0042,.0021),('pulse_sides_dx10um',.002,.002),
+        ('pulse_top_dx10um',.004,.0005)]:
+        write_pulse(tmp_path,name,w,h,0.)
+    compare_batch(tmp_path,dict(validation=dict(pulse_return_start_s=1.8e-6,pulse_return_error_limit=.01)))
+    default=tmp_path/'final/boundary_validation.json'
+    selected=tmp_path/'final/selected_boundary_proof.json'
+    proof=json.loads(default.read_text(encoding='utf-8'))
+    if custom_valid:
+        selected.write_text(json.dumps(proof),encoding='utf-8')
+        proof['boundary_validation_passed']=False
+        default.write_text(json.dumps(proof),encoding='utf-8')
+    else:
+        proof['pulse_provenance']['combined']['sha256']['trajectory.npz']='0'*64
+        selected.write_text(json.dumps(proof),encoding='utf-8')
+    case=tmp_path/'raw/manufactured_only'; case.mkdir()
+    (case/'effective.yaml').write_text(yaml.safe_dump(config),encoding='utf-8')
+    (case/'summary.json').write_text(json.dumps(summary),encoding='utf-8')
+    (case/'manifest.json').write_text(json.dumps(dict(status='completed',source_id='test-source',
+        fixture='manufactured, not LBM')),encoding='utf-8')
+    np.savez_compressed(case/'trajectory.npz',**data)
+    result,_=api.analyze_saved(case,selected)
+    assert result['checks']['boundary_evidence_bound'] is custom_valid
+    assert result['source_validation_passed'] is custom_valid
+    assert result['provenance']['boundary_path']==str(selected.resolve())
+    assert result['provenance']['boundary_sha256']==api._sha256(selected)

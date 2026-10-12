@@ -59,3 +59,18 @@ def test_saved_time_series_must_match_reported_complex_pressure():
     result['observer_pressure_Pa']*=2
     check=validate_propagation(source,result)
     assert not check['propagation_validation_passed']
+
+
+@pytest.mark.parametrize('damage',['truncated','gap','duplicate'])
+def test_propagation_requires_two_complete_regularly_sampled_periods(damage):
+    source,result=fixture()
+    if damage=='truncated':
+        selection=np.arange(32,len(result['time_s']))
+    elif damage=='gap':
+        selection=np.delete(np.arange(len(result['time_s'])),40)
+    else:
+        selection=np.r_[np.arange(40),39,np.arange(40,len(result['time_s']))]
+    result['time_s']=result['time_s'][selection]
+    result['observer_pressure_Pa']=result['observer_pressure_Pa'][:,selection]
+    with pytest.raises(ValueError,match='time'):
+        validate_propagation(source,result)
