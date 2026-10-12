@@ -13,8 +13,11 @@ defaults:
   cycles: 24
   stop_when_stable: true
   field_samples_per_cycle: 32
-  sponge_width_m: 0.0001
-  sponge_rate: 0.05
+  sponge_width_m: 0.0
+  sponge_rate: 0.0
+  pml_width_m: 0.0002
+  pml_target_return: 0.001
+  pml_alpha_Hz: 1000.0
 material:
   description: Literature-constructed aligned porous CNT equivalent sheet; not a measured specimen.
   source: https://doi.org/10.1021/nn507117a
@@ -38,8 +41,26 @@ cases:
     kind: pulse
     film_width_m: 0.0
     dx_m: 1.0e-5
-    width_m: 0.004
+    width_m: 0.0042
+    height_m: 0.0021
+    duration_s: 8.0e-6
+    pulse_sigma_m: 7.5e-5
+    pulse_amplitude_Pa: 1.0
+    probe_radius_m: 0.00025
+  - name: pulse_sides_dx10um
+    kind: pulse
+    film_width_m: 0.0
+    dx_m: 1.0e-5
     height_m: 0.002
+    duration_s: 8.0e-6
+    pulse_sigma_m: 7.5e-5
+    pulse_amplitude_Pa: 1.0
+    probe_radius_m: 0.00025
+  - name: pulse_top_dx10um
+    kind: pulse
+    film_width_m: 0.0
+    dx_m: 1.0e-5
+    width_m: 0.004
     duration_s: 8.0e-6
     pulse_sigma_m: 7.5e-5
     pulse_amplitude_Pa: 1.0

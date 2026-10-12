@@ -25,7 +25,8 @@ DEFAULTS=dict(kind='power',dx_m=1.305875e-6,width_m=.002,height_m=.0005,
     mean_power_W_m2=1.13/9e-4,C_A_J_m2K=.012888,sheet_conductance_W_K=5.7996e-7,
     G_W_m2K=0.,initial_temperature_K=300.,sponge_width_m=.0001,sponge_rate=.05,
     pulse_amplitude_Pa=1.,pulse_sigma_m=75e-6,probe_radius_m=.00025,
-    sample_every=1,field_samples_per_cycle=32,stop_when_stable=True)
+    sample_every=1,field_samples_per_cycle=32,stop_when_stable=True,
+    pml_width_m=0.,pml_target_return=.001,pml_alpha_Hz=1000.)
 
 
 def prepare_strip_case(parameters, base=None):
@@ -41,7 +42,8 @@ def prepare_strip_case(parameters, base=None):
                 'C_A_J_m2K','initial_temperature_K','pulse_sigma_m','probe_radius_m'):
         if not np.isfinite(p[key]) or p[key]<=0:
             raise ValueError(f'{key} must be positive and finite')
-    for key in ('film_width_m','sheet_conductance_W_K','G_W_m2K','sponge_width_m','sponge_rate'):
+    for key in ('film_width_m','sheet_conductance_W_K','G_W_m2K','sponge_width_m','sponge_rate',
+                'pml_width_m','pml_alpha_Hz'):
         if not np.isfinite(p[key]) or p[key]<0:
             raise ValueError(f'{key} must be nonnegative and finite')
     for key in ('sample_every','field_samples_per_cycle'):
@@ -49,6 +51,10 @@ def prepare_strip_case(parameters, base=None):
             raise ValueError(f'{key} must be a positive integer')
     if p['film_width_m']>=p['width_m'] or (p['kind']=='power' and p['film_width_m']==0):
         raise ValueError('finite film must have positive side margins')
+    if not np.isfinite(p['pml_target_return']) or not 0<p['pml_target_return']<1:
+        raise ValueError('pml_target_return must lie in (0,1)')
+    if p['pml_width_m'] and p['sponge_rate']:
+        raise ValueError('PML and legacy sponge cannot be combined')
     c=load_config(Path(base) if base else ROOT/'Compute/open_planar/e1_long_air.yaml')
     scale=p['dx_m']/c['lattice']['dx_m']
     c['lattice']['dt_s']*=scale
@@ -64,7 +70,8 @@ def prepare_strip_case(parameters, base=None):
     p.update(requested_width_m=p['width_m'],requested_height_m=p['height_m'],
              actual_width_m=nx*p['dx_m'],actual_height_m=ny*p['dx_m'],steps=steps,
              actual_duration_s=steps*m.lattice.dt_s,
-             sponge_cells=int(round(p['sponge_width_m']/p['dx_m'])))
+             sponge_cells=int(round(p['sponge_width_m']/p['dx_m'])),
+             pml_cells=int(round(p['pml_width_m']/p['dx_m'])))
     c['strip']=p
     return c
 
@@ -105,6 +112,10 @@ def collect_strip(solver,run):
     px=run['probe_radius_m']*np.cos(angles)
     py=run['probe_radius_m']*np.sin(angles)
     py=np.maximum(py,solver.y_m[0])
+    if run['kind']=='power':
+        # Exterior to all three handoff contours, but inside the active gas.
+        px=np.r_[px,0.,-.00078,.00078]
+        py=np.r_[py,.00028,.0001,.0001]
     records={key:[] for key in ('t_s','pressure_perturbation_Pa','velocity_x_m_s',
         'velocity_y_m_s','gas_mass_lu','gas_energy_J_m','audit','film_temperature_K',
         'film_wall_energy_J_m2','film_input_energy_J_m','film_leak_energy_J_m',
@@ -128,11 +139,11 @@ def collect_strip(solver,run):
         for half_width,height in ((.00065,.00015),(.0007,.0002),(.00075,.00025)):
             if half_width>=max(solver.x_m) or height>=max(solver.y_m):
                 raise ValueError('power domain does not contain all three handoff contours')
-            margin=run['sponge_cells']*m.lattice.dx_m
+            margin=max(run['sponge_cells'],run.get('pml_cells',0))*m.lattice.dx_m
             if (half_width<=max(abs(solver.film_x_min_m),abs(solver.film_x_max_m))
                     or half_width>=.5*solver.nx*m.lattice.dx_m-margin
                     or height>=solver.ny*m.lattice.dx_m-margin):
-                raise ValueError('handoff contours must enclose film and stay outside sponge')
+                raise ValueError('handoff contours must enclose film and stay outside sponge/PML')
             surfaces.append(upper_rectangle(half_width,height,2*m.lattice.dx_m))
         count=0
         for surface in surfaces:
@@ -141,7 +152,7 @@ def collect_strip(solver,run):
         surface_all={k:np.concatenate([s[k] for s in surfaces]) for k in surfaces[0]}
     field_stride=max(1,int(round(1/(run['frequency_Hz']*dt*run['field_samples_per_cycle']))))
     next_cycle=8
-    log_interval=max(1,run['steps']//20)
+    log_interval=max(1,min(100,run['steps']//20))
     for step in range(run['steps']):
         midpoint=(step+.5)*dt
         if run['kind']=='pulse':
@@ -166,10 +177,10 @@ def collect_strip(solver,run):
             max_film_residual=max(max_film_residual,abs(film_audit.residual_J_m))
             temperature=new
         power_integral+=work; leak_integral+=leak
-        # Independent sums of committed populations, not a rearranged film RHS.
-        mass,energy=_totals(solver)
-        f,g=solver._require_state()
-        minimum_f=min(minimum_f,float(f.min())); minimum_g=min(minimum_g,float(g.min()))
+        # Reuse the independent actual-population sums made before the accepted
+        # step was committed, never a value reconstructed from an equation RHS.
+        mass,energy=audit.gas_mass_after_lu,audit.gas_energy_after_J_m
+        minimum_f=min(minimum_f,audit.minimum_f); minimum_g=min(minimum_g,audit.minimum_g)
         item=asdict(audit)
         if np.size(audit.wall_mass_lu):
             max_wall_mass=max(max_wall_mass,float(np.max(abs(audit.wall_mass_lu))))
@@ -177,7 +188,6 @@ def collect_strip(solver,run):
         if audit_columns is None:
             audit_columns=list(scalar)
         # Keep audit and storage every step even when field observations are decimated.
-        macro=solver.get_macro()
         observed=((step+1)%(field_stride if surfaces else run['sample_every'])==0 or step+1==run['steps'])
         records['audit_t_s'].append((step+1)*dt)
         records['gas_mass_lu'].append(mass); records['gas_energy_J_m'].append(energy)
@@ -185,6 +195,7 @@ def collect_strip(solver,run):
         records['wall_energy_J_m'].append(float(np.sum(audit.wall_energy_J_m2)*solver.film_dx_m))
         records['film_storage_J_m'].append(float(np.sum(params.C_A_si*(temperature-film_initial))*solver.film_dx_m))
         if observed:
+            macro=solver.get_macro()
             records['t_s'].append((step+1)*dt)
             records['pressure_perturbation_Pa'].append(_sample_bilinear(macro.p*m.pressure_scale-pressure0,solver.x_m,solver.y_m,px,py))
             records['velocity_x_m_s'].append(_sample_bilinear(macro.u[...,0]*m.velocity_scale,solver.x_m,solver.y_m,px,py))
@@ -196,7 +207,8 @@ def collect_strip(solver,run):
             surface_times.append((step+1)*dt)
             # p/T/u are endpoint observations. Heat exchanges retain midpoints.
             channels=(macro.p*m.pressure_scale-pressure0,macro.u[...,0]*m.velocity_scale,
-                      macro.u[...,1]*m.velocity_scale,macro.theta*m.temperature_scale)
+                      macro.u[...,1]*m.velocity_scale,macro.theta*m.temperature_scale,
+                      macro.rho*m.rho_scale)
             surface_records.append(np.stack([_sample_bilinear(v,solver.x_m,solver.y_m,
                 surface_all['x_m'],surface_all['y_m']) for v in channels],axis=-1))
         if run['kind']=='power' and (step+1)*dt*run['frequency_Hz']>=next_cycle:
@@ -212,13 +224,46 @@ def collect_strip(solver,run):
                 checks.append(stationarity_at_cycle(observation,run['frequency_Hz'],next_cycle,
                     dict(stationary_relative=.01,stationary_phase_deg=1.)))
             stable=all(v['passed'] for v in checks)
-            stationary_history.append(dict(cycle=next_cycle,passed=stable,film_bin_checks=checks))
+            full_check={'evaluated':False,'passed':False}
+            if stable:
+                # Sparse probes are a preliminary screen. The exported curve
+                # and every membrane bin must also pass the SAME public fit
+                # windows and thresholds before a long run can stop early.
+                fields=np.asarray(surface_records)
+                observation=dict(t_s=np.asarray(surface_times),heat_time_s=state['t_s']-.5*dt,
+                    film_temperature_K=state['film_temperature_K'][:,0],
+                    wall_flux_W_m2=state['film_wall_energy_J_m2'][:,0]/dt,
+                    pressure_Pa=fields[...,0],velocity_m_s=fields[...,1]*surface_all['normal_x']
+                        +fields[...,2]*surface_all['normal_y'])
+                surface_check=stationarity_at_cycle(observation,run['frequency_Hz'],next_cycle,
+                    dict(stationary_relative=.01,stationary_phase_deg=1.))
+                failed_bins=[]
+                for index in range(len(temperature)):
+                    item=dict(t_s=state['t_s'],heat_time_s=state['t_s']-.5*dt,
+                        film_temperature_K=state['film_temperature_K'][:,index],
+                        wall_flux_W_m2=state['film_wall_energy_J_m2'][:,index]/dt,
+                        pressure_Pa=np.empty((len(state['t_s']),0)),
+                        velocity_m_s=np.empty((len(state['t_s']),0)))
+                    if not stationarity_at_cycle(item,run['frequency_Hz'],next_cycle,
+                        dict(stationary_relative=.01,stationary_phase_deg=1.))['passed']:
+                        failed_bins.append(index)
+                stable=bool(surface_check['passed'] and not failed_bins)
+                full_check=dict(evaluated=True,passed=stable,
+                    surface_passed=surface_check['passed'],surface_points=fields.shape[1],
+                    film_bins=len(temperature),failed_film_bins=failed_bins,
+                    failed_surface_channels=[name for name,value in surface_check.get('channels',{}).items()
+                                             if not value['passed']])
+            stationary_history.append(dict(cycle=next_cycle,passed=stable,film_bin_checks=checks,
+                                             full_field_check=full_check))
             next_cycle+=1
             if run['stop_when_stable'] and stable:
                 stop_reason='periodic_response_stable'
                 break
         if (step+1)%log_interval==0:
             print(f'  {step+1}/{run["steps"]} steps, t={(step+1)*dt:.6g}s, elapsed={time.perf_counter()-start:.1f}s',flush=True)
+    # A stable-cycle stop need not fall on the regular observation stride.
+    if not observed:
+        macro=solver.get_macro()
     data={k:np.asarray(v) for k,v in records.items()}
     data.update(heat_time_s=data['t_s']-.5*dt,probe_x_m=px,probe_y_m=py,
         audit_columns=np.asarray(audit_columns),initial_gas_mass_lu=initial_mass,
@@ -233,7 +278,7 @@ def collect_strip(solver,run):
     if surfaces:
         import json
         data.update(surface_t_s=np.asarray(surface_times),surface_fields=np.asarray(surface_records),
-            surface_channels=np.array(['pressure_perturbation_Pa','ux_m_s','uy_m_s','temperature_K']),
+            surface_channels=np.array(['pressure_perturbation_Pa','ux_m_s','uy_m_s','temperature_K','rho_kg_m3']),
             surface_slices=np.asarray(surface_slices),stationarity_json=json.dumps(stationary_history))
         data.update({f'surface_{k}':v for k,v in surface_all.items()})
     return data
@@ -245,12 +290,14 @@ def summarize_strip(data,config):
     column=lambda key:a[:,names.index(key)]
     wall=data['wall_energy_J_m']
     gas=data['gas_energy_J_m']-float(data['initial_gas_energy_J_m'])
-    gas_residual=gas-np.cumsum(wall+column('outer_energy_J_m')+column('sponge_energy_J_m'))
+    pml_energy=column('pml_energy_J_m') if 'pml_energy_J_m' in names else 0.
+    pml_mass=column('pml_mass_lu') if 'pml_mass_lu' in names else 0.
+    gas_residual=gas-np.cumsum(wall+column('outer_energy_J_m')+column('sponge_energy_J_m')+pml_energy)
     mass_residual=data['gas_mass_lu']-float(data['initial_gas_mass_lu'])-np.cumsum(
-        column('outer_mass_lu')+column('sponge_mass_lu'))
+        column('outer_mass_lu')+column('sponge_mass_lu')+pml_mass)
     film=data['film_storage_J_m']
     total_residual=film+2*gas-np.cumsum(data['film_input_energy_J_m']-data['film_leak_energy_J_m']
-        +2*(column('outer_energy_J_m')+column('sponge_energy_J_m')))
+        +2*(column('outer_energy_J_m')+column('sponge_energy_J_m')+pml_energy))
     checks=dict(finite=bool(all(np.all(np.isfinite(v)) for k,v in data.items()
                      if isinstance(v,np.ndarray) and np.issubdtype(v.dtype,np.number))),
         positive=bool(data['minimum_f']>0 and data['minimum_g']>0),
@@ -287,14 +334,16 @@ def run_strip_case(effective,output):
         raise FileExistsError(f'case already exists: {output}')
     source=capture_source(ROOT)
     solver=FiniteStripSolver(c,film_width_m=run['film_width_m'],
-        sponge_cells=run['sponge_cells'],sponge_rate=run['sponge_rate'])
+        sponge_cells=run['sponge_cells'],sponge_rate=run['sponge_rate'],
+        pml_cells=run.get('pml_cells',0),pml_target_return=run.get('pml_target_return',.001),
+        pml_alpha_Hz=run.get('pml_alpha_Hz',1000.))
     run.update(actual_film_x_min_m=float(solver.film_x_min_m),
                actual_film_x_max_m=float(solver.film_x_max_m))
     manifest=dict(status='running',created_utc=datetime.now(timezone.utc).isoformat(),
         finished_utc=None,**source,geometry='2D infinite strip, upper symmetric half-space',
         collision_backend='numba',phase_convention='exp(+i omega t)',
         pressure='direct gas pressure',film_edge='adiabatic, no electrodes/support solids',
-        exit='experimental characteristic plus explicitly audited relaxation layer',
+        exit=solver.boundary_model,
         boundary_validation_passed=None)
     output.mkdir(parents=True,exist_ok=False)
     (output/'effective.yaml').write_text(yaml.safe_dump(c,allow_unicode=True),encoding='utf-8')
@@ -356,7 +405,8 @@ def compare_pulse_cases(trial,reference,*,return_start_s,limit=.01,trial_effecti
                 or big['actual_width_m']<=small['actual_width_m']
                 or big['actual_height_m']<=small['actual_height_m']):
             raise ValueError('boundary reference must be a larger film-free pulse domain')
-        distance=min(big['actual_width_m']/2,big['actual_height_m'])-big['sponge_cells']*big['dx_m']
+        distance=min(big['actual_width_m']/2,big['actual_height_m'])-max(
+            big['sponge_cells'],big.get('pml_cells',0))*big['dx_m']
         reference_return_s=(2*distance-big['probe_radius_m']-6*big['pulse_sigma_m'])/create_unit_mapping(reference_effective).physical.c0_m_s
         if reference_return_s<=float(reference['t_s'][-1]):
             raise ValueError('reference acoustic return can reach probes in this window')

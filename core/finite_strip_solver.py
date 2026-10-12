@@ -33,6 +33,11 @@ class FiniteStripAudit:
     gas_energy_after_J_m: float
     mass_residual_lu: float
     energy_residual_J_m: float
+    pml_mass_lu: float = 0.
+    pml_energy_J_m: float = 0.
+    gas_mass_after_lu: float = float('nan')
+    minimum_f: float = float('nan')
+    minimum_g: float = float('nan')
 
 
 class FiniteStripSolver(GasSolver2D):
@@ -43,7 +48,8 @@ class FiniteStripSolver(GasSolver2D):
     exchange_is_local = True
 
     def __init__(self, config, *, film_width_m=1e-3, x_min_m=None,
-                 film_center_m=0., sponge_cells=0, sponge_rate=0.):
+                 film_center_m=0., sponge_cells=0, sponge_rate=0.,
+                 pml_cells=0, pml_target_return=.001, pml_alpha_Hz=1000.):
         super().__init__(config)
         if min(self.nx, self.ny) < 8:
             raise ValueError('finite strip requires nx,ny>=8')
@@ -83,6 +89,21 @@ class FiniteStripSolver(GasSolver2D):
         self._reference_f, self._reference_g = equilibrium_fg(self.mapping.lattice.rho_ref_lu,
             np.zeros(2), self.mapping.theta_ref_lu, self.mapping.lattice.S, self.lattice)
         self._kinetic = .5*np.sum(self.lattice.c**2, axis=1)
+        self.pml = None
+        if pml_cells:
+            if sponge_rate:
+                raise ValueError('acoustic PML and legacy sponge cannot be combined')
+            from boundary.acoustic_pml import AcousticPML
+            self.pml = AcousticPML(self.mapping,self.lattice,self.ny,self.nx,
+                cells=pml_cells,target_return=pml_target_return,alpha_Hz=pml_alpha_Hz,
+                backend=self.collision_backend)
+            self.boundary_model = 'experimental_acoustic_cfs_pml_with_outer_characteristic'
+        self.last_audit = None
+
+    def initialize_from_macro(self, rho, u, theta):
+        super().initialize_from_macro(rho,u,theta)
+        if self.pml is not None:
+            self.pml.memory.fill(0.)
         self.last_audit = None
 
     @property
@@ -94,7 +115,17 @@ class FiniteStripSolver(GasSolver2D):
         return (np.arange(self.ny)+.5)*self.mapping.lattice.dx_m
 
     def _totals(self, f, g):
+        if self.collision_backend == 'numba':
+            return np.asarray(self._population_statistics(f, g)[:2])
         return np.array([np.sum(f), np.sum(f*self._kinetic+g)])
+
+    def _population_statistics(self, f, g):
+        if self.collision_backend == 'numba':
+            from core.finite_strip_numba import population_statistics
+            return population_statistics(f, g, self._kinetic)
+        return (float(np.sum(f)), float(np.sum(f*self._kinetic+g)),
+                float(np.min(f)), float(np.min(g)),
+                bool(np.isfinite(f).all() and np.isfinite(g).all()))
 
     def population_extrema(self):
         return tuple(float(np.min(v)) for v in self._require_state())
@@ -119,8 +150,16 @@ class FiniteStripSolver(GasSolver2D):
         """
         f, g = self._require_state()
         before = self._totals(f, g)
+        pml_change = np.zeros(2)
+        if self.pml is not None:
+            f,g,pml_memory,pml_change = self.pml.advance(f,g,self.pml.memory,.5)
+            self._check_populations(f,g)
         fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice, backend=self.collision_backend)
-        fn, gn = (pull_stream_open_xy(v, lattice=self.lattice) for v in (fp, gp))
+        if self.collision_backend == 'numba':
+            from core.finite_strip_numba import stream_open_xy_pair
+            fn, gn = stream_open_xy_pair(fp, gp, self.lattice.c)
+        else:
+            fn, gn = (pull_stream_open_xy(v, lattice=self.lattice) for v in (fp, gp))
         self.boundary.write_specular(fp, gp, fn, gn)
         wall = PreparedStripWall(fp, gp, self.mapping, self.lattice, self.boundary)
         dx = self.mapping.lattice.dx_m
@@ -133,7 +172,7 @@ class FiniteStripSolver(GasSolver2D):
         temperature_K = solve_temperature(exchange)
         wall.write(temperature_K, fn, gn)
         characteristic_outer(fp, gp, fn, gn, self.mapping, self.lattice, self.boundary)
-        self._check_populations(fn, gn)
+        after_statistics = self._check_populations(fn, gn)
         # Independent accounting reads actual written populations, not the trial
         # heat function or film equation. Count every corner link exactly once.
         wall_change = (self.boundary.totals(fn, gn, wall=True, incoming=True)
@@ -142,27 +181,36 @@ class FiniteStripSolver(GasSolver2D):
                         -self.boundary.totals(fp, gp, wall=False, incoming=False))
         sponge_change = np.zeros(2)
         if self.sponge_rate:
-            pre_sponge = self._totals(fn, gn)
+            pre_sponge = np.asarray(after_statistics[:2])
             weight = self._sponge[..., None]
             fn += weight*(self._reference_f-fn)
             gn += weight*(self._reference_g-gn)
-            sponge_change = self._totals(fn, gn)-pre_sponge
-            self._check_populations(fn, gn)
-        after = self._totals(fn, gn)
-        residual = after-before-wall_change.sum(axis=1)-outer_change-sponge_change
+            after_statistics = self._check_populations(fn, gn)
+            sponge_change = np.asarray(after_statistics[:2])-pre_sponge
+        if self.pml is not None:
+            fn,gn,pml_memory,change = self.pml.advance(fn,gn,pml_memory,.5)
+            pml_change += change
+            after_statistics = self._check_populations(fn,gn)
+        after = np.asarray(after_statistics[:2])
+        residual = after-before-wall_change.sum(axis=1)-outer_change-sponge_change-pml_change
         audit = FiniteStripAudit(wall_change[0].copy(), wall_change[1]*area_scale,
             float(outer_change[0]), float(outer_change[1]*length_scale),
             float(sponge_change[0]), float(sponge_change[1]*length_scale),
             float(before[1]*length_scale), float(after[1]*length_scale),
-            float(residual[0]), float(residual[1]*length_scale))
+            float(residual[0]), float(residual[1]*length_scale),
+            float(pml_change[0]),float(pml_change[1]*length_scale),
+            gas_mass_after_lu=float(after[0]),minimum_f=after_statistics[2],minimum_g=after_statistics[3])
         self.f, self.g = fn, gn
+        if self.pml is not None:
+            self.pml.memory = pml_memory
         self.last_audit = audit
         self.t_lu += 1
         return audit
 
-    @staticmethod
-    def _check_populations(f, g):
-        if not np.isfinite(f).all() or not np.isfinite(g).all():
+    def _check_populations(self, f, g):
+        statistics = self._population_statistics(f, g)
+        if not statistics[4]:
             raise FloatingPointError('unfilled link or nonfinite finite-strip state; state not committed')
-        if np.min(f) <= 0 or np.min(g) <= 0:
+        if min(statistics[2:4]) <= 0:
             raise FloatingPointError('nonpositive finite-strip population; state not committed')
+        return statistics

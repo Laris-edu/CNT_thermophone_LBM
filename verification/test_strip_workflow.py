@@ -52,7 +52,9 @@ def test_short_spatial_film_coupling_keeps_every_energy_interval(tmp_path):
         assert len(data['t_s'])<len(data['audit_t_s'])
         assert data['film_temperature_K'].shape[1]==100
         assert np.all(data['film_temperature_K'][-1]>300)
-        assert data['surface_fields'].shape[2]==4
+        assert data['surface_fields'].shape[2]==5
+        assert data['surface_channels'].tolist()==['pressure_perturbation_Pa','ux_m_s','uy_m_s',
+                                                   'temperature_K','rho_kg_m3']
         assert abs(data['film_storage_J_m'][-1]+2*(data['gas_energy_J_m'][-1]-data['initial_gas_energy_J_m'])
             -np.sum(data['film_input_energy_J_m'])
             -2*np.sum(data['audit'][:,list(data['audit_columns']).index('outer_energy_J_m')]))<1e-10

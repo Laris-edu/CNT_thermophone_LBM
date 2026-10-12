@@ -30,16 +30,29 @@
 `simulation.finite_strip`。它复用 D2Q37 局部输运，底边膜内逐段漫反射、膜外镜面对称，
 以 `coupling.finite_strip.solve_strip_film_midpoint` 解沿膜导热与双侧实际交换。
 数组仍为 `(ny,nx,Q)`；气体域在上半空间，第三方向无限长，总能量为 J/m。
-顶部和左右边界的局部法向特征条件与显式记账吸收层尚需二维反射验证；
-数值完成、正性和能量闭合不能代替该验证。原平面入口与默认值不变。
+顶部和左右边界可显式选用 `pml_width_m` 声学 CFS-PML：四个方向记忆变量
+通过平衡态增量耦合到原生 D2Q37 流步，读取当前局部密度与声速，独立记录
+`pml_mass_lu` 与 `pml_energy_J_m`。它是待逐工况验证的声学吸收层，尚不宣称
+完整热黏性离散系统严格匹配。旧局部法向边界/松弛层保留用于历史复现；
+PML 与旧松弛层不能同时启用，原平面入口与默认值不变。
+数值完成、正性和能量闭合不能代替二维返回误差及 20 kHz 近场验证。
 
 `Compute/finite_strip/study.yaml` 配置 1 mm 膜宽、0.5 mm 上半域候选及大域脉冲对照，
 用 `python -m Compute.finite_strip.run --batch <新批次> --dry-run` 检查展开参数；
-`--case <名称>` 单独执行，`--compare-pulses` 比较保存的候选/参考脉冲。
+`--case <名称>` 单独执行，`--compare-pulses` 比较保存的候选/参考脉冲与侧边隔离脉冲。
+默认吸收带厚 0.2 mm，位于固定上半域内：顶部从 y=0.3 mm 开始，侧面从
+|x|=0.8 mm 开始（实际位置随完整网格单元取整），三条交接线均在吸收带外。
+`pml_target_return` 是连续层阻尼设计值，不是计算得到或保证达到的返回误差。
 功率计算先受脉冲门禁约束，之后仍需 20 kHz、网格、域长和闭合线稳定性检查。
 `farfield.strip_surface` 按压力/切向速度偶对称、法向速度奇对称补齐闭合线；
 `Compute/finite_strip/kwave_handoff.m` 将其转换为 k-Wave 质量源与力源。
 该适配器的独立声源测试不等于 LBM 近场或有限条膜链路验证。
+边界比较通过后，`python -m Compute.finite_strip.chain --batch <同一新批次>`
+连续执行功率近场、`analyze.py` 的全部膜段/交接线稳定性和直接压力对照、合格源导出、
+MATLAB 调用以及 45 mm 传播核验；任一门禁失败即停止并保留诊断。
+边界证据核对保存数据哈希、几何/PML 参数和公共源码身份。
+`validation_passed` 只覆盖运行状态与全场周期稳定，`source_validation_passed` 另含交接条件，
+`propagation_validation_passed` 仅在真实 k-Wave 结果通过独立核验后赋值。
 
 ## 2. 公共代码导航
 

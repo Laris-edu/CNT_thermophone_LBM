@@ -85,7 +85,8 @@ def read_batch(batch):
             if not np.allclose(np.diff(case['data'][key]), dx, rtol=0, atol=1e-14):
                 raise ValueError('saved field coordinates do not match the effective grid')
     comparison_path = batch/'final/boundary_validation.json'
-    comparison = _json(comparison_path)
+    saved_comparison = _json(comparison_path)
+    comparison = saved_comparison.get('components',{}).get('combined',saved_comparison)
     inputs.append(comparison_path)
     limit, start = float(comparison['limit']), float(comparison['return_start_s'])
     if not np.isfinite(limit) or limit <= 0 or not np.isfinite(start):
@@ -198,7 +199,8 @@ def make_figure(cases, comparison, difference, maxima):
     for probe, color in zip(selected, SELECTED_COLORS):
         field_axis.scatter(small['probe_x_m'][probe]*1e3, small['probe_y_m'][probe]*1e3,
                            s=18, color=color, edgecolors='white', linewidths=.6, zorder=5)
-    margin = cases[0]['effective']['strip']['sponge_cells']*dx*1e3
+    margin = max(cases[0]['effective']['strip']['sponge_cells'],
+                 cases[0]['effective']['strip'].get('pml_cells',0))*dx*1e3
     if margin > 0:
         field_axis.plot([extent[0]+margin, extent[0]+margin, extent[1]-margin, extent[1]-margin],
                         [0, extent[3]-margin, extent[3]-margin, 0],
@@ -222,7 +224,7 @@ def make_figure(cases, comparison, difference, maxima):
     fig.text(.10, .975, 'Open-boundary pulse screening', fontsize=12, fontweight='bold', va='top')
     fig.text(.10, .945, f'Runs: completed / completed     State checks: {state[0]} / {state[1]}',
              fontsize=8.2, va='top')
-    fig.text(.10, .922, f'Boundary criterion: {passed}   |   maximum error {100*np.max(maxima):.3f}%   |   limit {threshold:g}%',
+    fig.text(.10, .922, f'Combined pulse: {passed}   |   maximum error {100*np.max(maxima):.3f}%   |   limit {threshold:g}%',
              fontsize=8.2, va='top', color='#00705C' if passed == 'PASS' else '#A33131')
     width_small, height_small = (cases[0]['effective']['strip'][key]*1e3 for key in ('actual_width_m', 'actual_height_m'))
     width_large, height_large = (cases[1]['effective']['strip'][key]*1e3 for key in ('actual_width_m', 'actual_height_m'))
@@ -230,7 +232,7 @@ def make_figure(cases, comparison, difference, maxima):
              fontsize=7.5, va='top')
     fig.text(.10, .075, f'Error = |candidate − reference| / peak |reference| at each probe. Criterion: t ≥ {start:g} µs (unshaded).',
              fontsize=7, va='top')
-    fig.text(.10, .057, f'Red dashed: {threshold:g}% limit. Colored traces / markers match a–c; all 13 probes shown. Field dashed: sponge edge.',
+    fig.text(.10, .057, f'Red dashed: {threshold:g}% limit. Colored traces / markers match a–c; all 13 probes shown. Field dashed: absorber edge.',
              fontsize=7, va='top')
     fig.text(.10, .031, '10 µm coarse-grid boundary screening only; no 20 kHz or membrane thermal-layer certification.',
              fontsize=7.3, fontweight='bold', va='top')

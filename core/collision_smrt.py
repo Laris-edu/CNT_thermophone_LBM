@@ -387,9 +387,16 @@ def collide_fg(
     lattice = lattice or make_lattice()
     f = np.asarray(f, dtype=float)
     g = np.asarray(g, dtype=float)
-    macro_before = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
+    if backend == 'numba':
+        from core.collision_numba import recover_macro_compiled, equilibrium_compiled
+        macro_before = recover_macro_compiled(f, g, D=mapping.lattice.D,
+                                             S=mapping.lattice.S, lattice=lattice)
+        prepare_equilibrium = equilibrium_compiled
+    else:
+        macro_before = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
+        prepare_equilibrium = equilibrium_fg
     transport = local_transport_coefficients(mapping, macro_before.rho, macro_before.theta)
-    f_eq, g_eq = equilibrium_fg(
+    f_eq, g_eq = prepare_equilibrium(
         macro_before.rho,
         macro_before.u,
         macro_before.theta,
