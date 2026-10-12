@@ -1,11 +1,40 @@
 """Read-only Git and source-hash records; never archive or copy source files."""
 import hashlib
 import json
+import os
+import platform
 from pathlib import Path
 import subprocess
 
 SOURCE_DIRS=('core','boundary','coupling','phase3_interfaces','farfield','postproc',
              'reference','simulation','scripts','configs')
+
+
+def capture_numba_runtime(cell_count):
+    """Record effective dispatch; environment settings are not source hashes."""
+    import llvmlite
+    import numba
+    import numpy as np
+    from core.collision_numba import PARALLEL_MIN_CELLS, _parallel_field
+
+    # get_num_threads initializes the selected threading layer, including on
+    # a serial-sized case. It does not claim that its kernels ran in parallel.
+    threads = numba.get_num_threads()
+    affinity = sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None
+    available = (len(affinity) if affinity is not None else
+                 (getattr(os, 'process_cpu_count', os.cpu_count)() or 1))
+    return dict(cell_count=int(cell_count), parallel_min_cells=PARALLEL_MIN_CELLS,
+        parallel_selected=bool(_parallel_field(cell_count)), numba_threads=threads,
+        numba_thread_limit=numba.config.NUMBA_NUM_THREADS,
+        threading_layer=numba.threading_layer(), cpu_available=available,
+        cpu_logical_count=os.cpu_count(), cpu_affinity=affinity,
+        platform=platform.platform(), machine=platform.machine(),
+        versions=dict(python=platform.python_version(), numpy=np.__version__,
+                      numba=numba.__version__, llvmlite=llvmlite.__version__),
+        environment={name:os.environ.get(name) for name in (
+            'NUMBA_NUM_THREADS', 'NUMBA_THREADING_LAYER', 'CNT_LBM_PARALLEL_MIN_CELLS',
+            'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'BLIS_NUM_THREADS',
+            'OMP_NUM_THREADS', 'OMP_DYNAMIC', 'NUMEXPR_NUM_THREADS')})
 
 
 def source_files(root):

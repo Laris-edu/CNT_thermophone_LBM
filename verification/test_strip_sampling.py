@@ -83,13 +83,9 @@ def test_power_saves_exterior_direct_probes_and_surface_density():
 
 
 def test_power_rejects_handoff_surface_inside_pml_before_stepping():
-    config = prepare_strip_case(dict(name='pml_margin', kind='power', dx_m=1e-5,
-        sponge_width_m=0., sponge_rate=0., pml_width_m=.0003))
-    run = dict(config['strip'], steps=1)
-    gas = FiniteStripSolver(config, film_width_m=.001, pml_cells=run['pml_cells'])
     with pytest.raises(ValueError, match='outside'):
-        collect_strip(gas, run)
-    assert gas.t_lu == 0
+        prepare_strip_case(dict(name='pml_margin', kind='power', dx_m=1e-5,
+            sponge_width_m=0., sponge_rate=0., pml_width_m=.0003))
 
 
 def test_early_stop_waits_for_the_entire_handoff_line(monkeypatch):

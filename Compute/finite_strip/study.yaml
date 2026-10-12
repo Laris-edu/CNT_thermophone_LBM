@@ -2,7 +2,7 @@
 base_config: ../open_planar/e1_long_air.yaml
 defaults:
   width_m: 0.002
-  height_m: 0.0005
+  height_m: 0.0002
   film_width_m: 0.001
   frequency_Hz: 20000.0
   mean_power_W_m2: 1255.5555555555557
@@ -15,9 +15,20 @@ defaults:
   field_samples_per_cycle: 32
   sponge_width_m: 0.0
   sponge_rate: 0.0
-  pml_width_m: 0.0002
+  pml_width_m: 0.00008
   pml_target_return: 0.001
   pml_alpha_Hz: 1000.0
+  # Three nested upper contours, (half-width, height), in metres.
+  # Gamma 2 is the requested 1.8 mm wide by 0.1 mm high handoff.
+  handoff_contours_m:
+    - [0.00085, 0.00009]
+    - [0.00090, 0.00010]
+    - [0.00091, 0.00011]
+  validation_probes_m:
+    - [0.0, 0.000115]
+    - [-0.000915, 0.00005]
+    - [0.000915, 0.00005]
+  probe_radius_m: 0.000075
 material:
   description: Literature-constructed aligned porous CNT equivalent sheet; not a measured specimen.
   source: https://doi.org/10.1021/nn507117a
@@ -34,9 +45,10 @@ cases:
     film_width_m: 0.0
     dx_m: 1.0e-5
     duration_s: 8.0e-6
-    pulse_sigma_m: 7.5e-5
+    # Initial Gaussian is negligible at the nearest PML entrance (6 sigma).
+    pulse_sigma_m: 2.0e-5
     pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00025
+    probe_radius_m: 0.00005
   - name: pulse_reference_dx10um
     kind: pulse
     film_width_m: 0.0
@@ -44,32 +56,33 @@ cases:
     width_m: 0.0042
     height_m: 0.0021
     duration_s: 8.0e-6
-    pulse_sigma_m: 7.5e-5
+    pulse_sigma_m: 2.0e-5
     pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00025
+    probe_radius_m: 0.00005
   - name: pulse_sides_dx10um
     kind: pulse
     film_width_m: 0.0
     dx_m: 1.0e-5
     height_m: 0.002
     duration_s: 8.0e-6
-    pulse_sigma_m: 7.5e-5
+    pulse_sigma_m: 2.0e-5
     pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00025
+    probe_radius_m: 0.00005
   - name: pulse_top_dx10um
     kind: pulse
     film_width_m: 0.0
     dx_m: 1.0e-5
     width_m: 0.004
     duration_s: 8.0e-6
-    pulse_sigma_m: 7.5e-5
+    pulse_sigma_m: 2.0e-5
     pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00025
+    probe_radius_m: 0.00005
   - name: power_r2
     kind: power
     dx_m: 1.305875e-6
 validation:
-  pulse_return_start_s: 1.8e-6
+  # Include the whole saved record; the smaller top can return before 1.8 us.
+  pulse_return_start_s: 0.0
   pulse_return_error_limit: 0.01
   propagation_amplitude_relative: 0.01
   propagation_phase_deg: 1.0

@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 
 import numpy as np
+import yaml
 from scipy.io import loadmat
 
 from Compute.finite_strip.analyze import main as analyze_main
@@ -101,36 +102,58 @@ def validate_propagation(source,result):
               'independent Kirchhoff numerical comparison, no direct LBM or experimental field at 45 mm')
 
 
-def main():
+def main(argv=None):
     parser=argparse.ArgumentParser(__doc__)
     parser.add_argument('--batch',required=True)
     parser.add_argument('--study',type=Path,default=Path(__file__).with_name('study.yaml'))
+    parser.add_argument('--stage',choices=('all','propagate'),default='all')
     parser.add_argument('--matlab',type=Path,default=Path('E:/Matlab/bin/matlab.exe'))
     parser.add_argument('--toolbox',type=Path,default=ROOT/'k-wave-toolbox-version-1.4.1')
-    args=parser.parse_args()
-    _,cases=load_cases(args.study.resolve())
+    args=parser.parse_args(argv)
     root=args.study.resolve().parent/valid_name(args.batch)
-    config=cases['power_r2']
-    validate_boundary_evidence(root,config)
     case=root/'raw/power_r2'
+    if args.stage=='all':
+        _,cases=load_cases(args.study.resolve())
+        config=cases['power_r2']
+        validate_boundary_evidence(root,config)
+    else:
+        # A downloaded run is defined by its saved configuration and runtime,
+        # not by the current study or this machine's public-source identity.
+        for name in ('effective.yaml','manifest.json','trajectory.npz','summary.json'):
+            if not (case/name).is_file():
+                raise FileNotFoundError(case/name)
+        config=yaml.safe_load((case/'effective.yaml').read_text(encoding='utf-8'))
+        manifest=json.loads((case/'manifest.json').read_text(encoding='utf-8'))
+        summary=json.loads((case/'summary.json').read_text(encoding='utf-8'))
+        if manifest.get('status')!='completed' or summary.get('status')!='completed':
+            raise ValueError('propagation requires a completed saved nearfield run')
+        if not manifest.get('source_id'):
+            raise ValueError('saved nearfield runtime source identity is missing')
+        if manifest.get('source_clean') is not True or not manifest.get('git_commit'):
+            raise ValueError('propagation requires a committed clean simulation runtime')
+        validate_boundary_evidence(root,config,source_id=manifest['source_id'])
     # Fail dependency and overwrite checks before the many-hour LBM run.
     if not args.matlab.is_file() or not (args.toolbox/'kspaceFirstOrder2D.m').is_file():
         raise FileNotFoundError('MATLAB executable or k-Wave entry point is missing')
-    for path in [case,*[root/'final'/name for name in ('power_r2_nearfield.json','power_r2_nearfield.npz',
-                 'power_r2_kwave_input.mat','power_r2_kwave_output.mat','propagation_validation.json')]]:
+    outputs=[root/'final'/name for name in ('power_r2_nearfield.json','power_r2_nearfield.npz',
+                 'power_r2_kwave_input.mat','power_r2_kwave_output.mat','propagation_validation.json')]
+    for path in ([case] if args.stage=='all' else [])+outputs:
         if path.exists():
             raise FileExistsError(path)
     quote=lambda path:"'"+Path(path).resolve().as_posix().replace("'","''")+"'"
     probe=f"addpath({quote(args.toolbox)});assert(~isempty(which('kspaceFirstOrder2D')));disp('MATLAB/k-Wave preflight passed')"
-    subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
-    print(json.dumps(dict(stage='power',output=str(case),exists=case.exists(),
-        nx=config['numerics']['nx'],ny=config['numerics']['ny'],steps=config['strip']['steps'],
-        dt_s=config['lattice']['dt_s']),indent=2),flush=True)
-    run_strip_case(config,case)
+    if args.stage=='all':
+        subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
+        print(json.dumps(dict(stage='power',output=str(case),exists=case.exists(),
+            nx=config['numerics']['nx'],ny=config['numerics']['ny'],steps=config['strip']['steps'],
+            dt_s=config['lattice']['dt_s']),indent=2),flush=True)
+        run_strip_case(config,case)
     status=analyze_main(['--batch',str(root),'--case','power_r2','--export-kwave','--toolbox',str(args.toolbox)])
     if status:
         print('Nearfield/source gate failed; diagnostics saved and propagation not started.',flush=True)
         return status
+    if args.stage=='propagate':
+        subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
     incoming=root/'final/power_r2_kwave_input.mat'
     outgoing=root/'final/power_r2_kwave_output.mat'
     if outgoing.exists():

@@ -37,11 +37,18 @@
 PML 与旧松弛层不能同时启用，原平面入口与默认值不变。
 数值完成、正性和能量闭合不能代替二维返回误差及 20 kHz 近场验证。
 
-`Compute/finite_strip/study.yaml` 配置 1 mm 膜宽、0.5 mm 上半域候选及大域脉冲对照，
+`Compute/finite_strip/study.yaml` 配置 1 mm 膜宽、2 mm × 0.2 mm 上半域候选及大域脉冲对照，
 用 `python -m Compute.finite_strip.run --batch <新批次> --dry-run` 检查展开参数；
 `--case <名称>` 单独执行，`--compare-pulses` 比较保存的候选/参考脉冲与侧边隔离脉冲。
-默认吸收带厚 0.2 mm，位于固定上半域内：顶部从 y=0.3 mm 开始，侧面从
-|x|=0.8 mm 开始（实际位置随完整网格单元取整），三条交接线均在吸收带外。
+该专题吸收带厚 0.08 mm，位于固定上半域内：名义顶部从 y=0.12 mm 开始，侧面从
+|x|=0.92 mm 开始（实际位置随完整网格单元取整）。三条上半交接线的
+`handoff_contours_m` 按 `[半宽, 高度]` 配置为 (0.85,0.09)、(0.90,0.10)、
+(0.91,0.11) mm；主线为第二条，宽 1.8 mm、高 0.1 mm。
+`validation_probes_m` 为三条线外的直接压力探针，当前在 (0,0.115)、
+(-0.915,0.05)、(0.915,0.05) mm。展开配置即检查实际膜边缘、嵌套关系和整个
+双线性插值模板均在非吸收区。公共默认旧几何保留，旧批次的 effective.yaml 不改。
+缩域脉冲用 sigma=20 μm、探针半径 50 μm，比较整个保存时序以捕捉更早的顶部返回；
+仍是 dx=10 μm 的宽带检查，不能代替 r2 热黏性近场或 20 kHz 验证。
 `pml_target_return` 是连续层阻尼设计值，不是计算得到或保证达到的返回误差。
 功率计算先受脉冲门禁约束，之后仍需 20 kHz、网格、域长和闭合线稳定性检查。
 `farfield.strip_surface` 按压力/切向速度偶对称、法向速度奇对称补齐闭合线；
@@ -53,6 +60,49 @@ MATLAB 调用以及 45 mm 传播核验；任一门禁失败即停止并保留诊
 边界证据核对保存数据哈希、几何/PML 参数和公共源码身份。
 `validation_passed` 只覆盖运行状态与全场周期稳定，`source_validation_passed` 另含交接条件，
 `propagation_validation_passed` 仅在真实 k-Wave 结果通过独立核验后赋值。
+
+### 有限条膜的 64 线程服务器入口
+
+在 Ubuntu 26.04 x86_64 的同一 Git 提交下建立 Python 3.14 虚拟环境，并按
+`requirements-lock.txt` 安装依赖；只部署代码与配置，历史结果、Windows `.venv`、
+MATLAB 和 k-Wave 留在本机。服务器只运行 Python LBM，普通按量实例适合正式长算。
+现有异常输出不是可恢复检查点；抢占回收可能丢失未完成时序，`tmux` 仅防止 SSH 断线。
+
+```bash
+python3.14 -m venv .venv
+.venv/bin/python -m pip install -r requirements-lock.txt
+.venv/bin/python -m Compute.finite_strip.cloud --batch cloud_001 --stage boundary --dry-run
+.venv/bin/python -m Compute.finite_strip.cloud --batch cloud_001 --stage boundary
+.venv/bin/python -m Compute.finite_strip.cloud --batch cloud_001 --stage power --dry-run
+.venv/bin/python -m Compute.finite_strip.cloud --batch cloud_001 --stage power
+```
+
+每次使用不存在的新批次名。入口在新 Python 子进程导入 Numba 前设置
+`NUMBA_NUM_THREADS=64`、`CNT_LBM_PARALLEL_MIN_CELLS=131072`，并限制 BLAS 线程。
+公共并行门槛默认仍为 262144 格；本专题 r2 为 234396 格，因此云入口会选择并行。
+`--threads 16` 可用于本机检查，正式运行拒绝请求超过进程可用 CPU 数的线程；
+`--dry-run` 可以在本机展示 64 线程配置，但不会运行内核或宣称硬件可用。
+manifest 的 `runtime_started` / `runtime` 记录实际线程数、线程池上限、线程层、
+格点门槛、调度选择、CPU 可用范围及依赖版本。CPU 线程数不是性能保证，膜温求解、
+部分 NumPy 操作和 I/O 仍有串行开销；首次 JIT 与稳定运行耗时需分开报告。
+云入口检查保存的验证数据，失败返回非零退出码并保留诊断；子进程正常结束不等于通过。
+功率阶段的状态/周期门禁与原始 `validation_passed`、后续源交接/传播门禁分开报告。
+
+边界和功率计算必须在同一公共源码身份下运行；缩域不能复用旧域的通过证明。
+将整个新批次的四组边界原始数据、功率四文件和 `final/boundary_validation.json`
+按原始字节传回本机，再执行以下命令。此阶段读取保存的配置和云端源码身份，
+不会重跑 LBM；合格后才在本机生成带本地工具箱路径的 MAT。
+LBM 的直接探针仍使用保存的原坐标；k-Wave 的 50 μm 网格不能把这些近源点直接
+吸附到声源线上。导出时把过近的传播核验点沿外法向方向移至距主矩形至少三格，
+并检查吸附后仍有两格间距。当前三点为 (0,0.25)、(-1.05,0.05)、(1.05,0.05) mm，
+仅用于独立 Kirchhoff 传播对照，不能称作这些位置的 LBM 直接验证。
+
+```powershell
+.\.venv\Scripts\python.exe -m Compute.finite_strip.chain --batch cloud_001 --stage propagate --matlab E:/Matlab/bin/matlab.exe --toolbox E:/CNT_thermophone_LBM/k-wave-toolbox-version-1.4.1
+```
+
+原始云端数据与本机分析的源码身份分别记录，避免 Windows/Linux 行尾差异被误当作
+同一原始字节；不改写已保存的哈希或四文件。已有分析/传播文件仍拒绝覆盖。
 
 ## 2. 公共代码导航
 

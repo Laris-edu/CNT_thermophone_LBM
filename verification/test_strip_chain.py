@@ -74,3 +74,90 @@ def test_propagation_requires_two_complete_regularly_sampled_periods(damage):
     result['observer_pressure_Pa']=result['observer_pressure_Pa'][:,selection]
     with pytest.raises(ValueError,match='time'):
         validate_propagation(source,result)
+
+
+def _saved_stage(tmp_path, monkeypatch):
+    import json
+    import yaml
+    from Compute.finite_strip import chain
+    root = tmp_path/'downloaded'
+    raw = root/'raw/power_r2'
+    raw.mkdir(parents=True)
+    config = dict(case=dict(name='power_r2'), strip=dict(kind='power', height_m=.0002))
+    (raw/'effective.yaml').write_text(yaml.safe_dump(config), encoding='utf-8')
+    (raw/'manifest.json').write_text(json.dumps(dict(status='completed', source_id='original_cloud_runtime',
+                                                    source_clean=True, git_commit='cloud_commit')))
+    (raw/'summary.json').write_text(json.dumps(dict(status='completed')))
+    np.savez(raw/'trajectory.npz', t_s=np.array([0.]))
+    matlab = tmp_path/'matlab.exe'; matlab.touch()
+    toolbox = tmp_path/'local_kwave'; toolbox.mkdir()
+    (toolbox/'kspaceFirstOrder2D.m').touch()
+    monkeypatch.setattr(chain, 'load_cases', lambda *a: pytest.fail('read current study'))
+    monkeypatch.setattr(chain, 'run_strip_case', lambda *a: pytest.fail('restarted LBM'))
+    def evidence(directory, actual, **kwargs):
+        assert directory == root and actual == config
+        assert kwargs['source_id'] == 'original_cloud_runtime'
+        return dict(boundary_validation_passed=True)
+    monkeypatch.setattr(chain, 'validate_boundary_evidence', evidence)
+    args = ['--stage', 'propagate', '--study', str(tmp_path/'missing_study.yaml'),
+            '--batch', 'downloaded', '--matlab', str(matlab), '--toolbox', str(toolbox)]
+    return chain, root, toolbox, args
+
+
+def test_propagate_stage_uses_saved_runtime_and_stops_failed_source_before_matlab(tmp_path, monkeypatch):
+    chain, root, toolbox, args = _saved_stage(tmp_path, monkeypatch)
+    monkeypatch.setattr(chain, 'analyze_main', lambda argv: 2)
+    monkeypatch.setattr(chain.subprocess, 'run', lambda *a, **k: pytest.fail('MATLAB started on failed source'))
+    assert chain.main(args) == 2
+    assert not (root/'final/propagation_validation.json').exists()
+
+
+def test_propagate_stage_exports_local_path_and_runs_existing_numerical_gate(tmp_path, monkeypatch):
+    import json
+    from scipy.io import savemat, loadmat
+    chain, root, toolbox, args = _saved_stage(tmp_path, monkeypatch)
+    source, result = fixture()
+    source['observer_role'] = source['observer_role'].astype(object)
+    def analyze(argv):
+        assert argv[argv.index('--toolbox')+1] == str(toolbox)
+        source['toolbox_path'] = str(toolbox)
+        (root/'final').mkdir()
+        savemat(root/'final/power_r2_kwave_input.mat', source)
+        return 0
+    monkeypatch.setattr(chain, 'analyze_main', analyze)
+    commands = []
+    def matlab(command, **kwargs):
+        commands.append(command[-1])
+        if 'kwave_handoff(' in command[-1]:
+            savemat(root/'final/power_r2_kwave_output.mat', result)
+    monkeypatch.setattr(chain.subprocess, 'run', matlab)
+    assert chain.main(args) == 0
+    saved = json.loads((root/'final/propagation_validation.json').read_text())
+    assert saved['propagation_validation_passed'] is True
+    assert saved['input_sha256'] and saved['output_sha256']
+    assert str(loadmat(root/'final/power_r2_kwave_input.mat', squeeze_me=True)['toolbox_path']) == str(toolbox)
+    assert sum('kwave_handoff(' in command for command in commands) == 1
+    with pytest.raises(FileExistsError):
+        chain.main(args)
+    assert sum('kwave_handoff(' in command for command in commands) == 1
+
+
+def test_propagate_stage_rejects_incomplete_raw_run(tmp_path, monkeypatch):
+    chain, root, toolbox, args = _saved_stage(tmp_path, monkeypatch)
+    (root/'raw/power_r2/manifest.json').write_text('{"status":"interrupted","source_id":"original_cloud_runtime"}')
+    monkeypatch.setattr(chain, 'analyze_main', lambda *a: pytest.fail('analyzed incomplete run'))
+    with pytest.raises(ValueError, match='completed'):
+        chain.main(args)
+
+
+@pytest.mark.parametrize('field,value', [('source_clean', False), ('git_commit', None)])
+def test_propagate_stage_requires_committed_clean_simulation_runtime(tmp_path, monkeypatch, field, value):
+    import json
+    chain, root, toolbox, args = _saved_stage(tmp_path, monkeypatch)
+    path = root/'raw/power_r2/manifest.json'
+    manifest = json.loads(path.read_text())
+    manifest[field] = value
+    path.write_text(json.dumps(manifest))
+    monkeypatch.setattr(chain, 'analyze_main', lambda *a: pytest.fail('analyzed uncommitted runtime'))
+    with pytest.raises(ValueError, match='committed'):
+        chain.main(args)

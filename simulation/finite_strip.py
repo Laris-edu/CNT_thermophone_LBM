@@ -26,11 +26,70 @@ DEFAULTS=dict(kind='power',dx_m=1.305875e-6,width_m=.002,height_m=.0005,
     G_W_m2K=0.,initial_temperature_K=300.,sponge_width_m=.0001,sponge_rate=.05,
     pulse_amplitude_Pa=1.,pulse_sigma_m=75e-6,probe_radius_m=.00025,
     sample_every=1,field_samples_per_cycle=32,stop_when_stable=True,
-    pml_width_m=0.,pml_target_return=.001,pml_alpha_Hz=1000.)
+    pml_width_m=0.,pml_target_return=.001,pml_alpha_Hz=1000.,
+    handoff_contours_m=[[.00065,.00015],[.0007,.0002],[.00075,.00025]],
+    validation_probes_m=[[0.,.00028],[-.00078,.0001],[.00078,.0001]])
+
+
+def _check_interpolation_template(px,py,x,y,padding,*,name):
+    """Check both neighbours on each axis, including zero-weight endpoints."""
+    if (not np.isfinite(px).all() or not np.isfinite(py).all()
+            or np.any(px<x[0]) or np.any(px>x[-1])
+            or np.any(py<y[0]) or np.any(py>y[-1])):
+        raise ValueError(f'{name} interpolation points must lie on the actual cell-centre grid')
+    ix=np.clip(np.searchsorted(x,px,side='right')-1,0,len(x)-2)
+    iy=np.clip(np.searchsorted(y,py,side='right')-1,0,len(y)-2)
+    if (np.any(ix<padding) or np.any(ix+1>=len(x)-padding)
+            or np.any(iy+1>=len(y)-padding)):
+        raise ValueError(f'{name} interpolation template must stay outside sponge/PML')
+
+
+def _observation_geometry(run,nx,ny):
+    """Prepare exact sampling points using rounded grid cells, without a solver."""
+    dx=run['dx_m']
+    x=-.5*nx*dx+(np.arange(nx)+.5)*dx
+    y=(np.arange(ny)+.5)*dx
+    angles=np.linspace(.04,np.pi-.04,13)
+    px=run['probe_radius_m']*np.cos(angles)
+    py=np.maximum(run['probe_radius_m']*np.sin(angles),y[0])
+    surfaces=[]
+    if run['kind']=='power':
+        from farfield.strip_surface import upper_rectangle
+        contours=np.asarray(run.get('handoff_contours_m',DEFAULTS['handoff_contours_m']),dtype=float)
+        probes=np.asarray(run.get('validation_probes_m',DEFAULTS['validation_probes_m']),dtype=float)
+        if contours.shape!=(3,2) or not np.isfinite(contours).all() or np.any(contours<=0):
+            raise ValueError('handoff_contours_m requires three finite positive [half_width,height] pairs')
+        if np.any(np.diff(contours,axis=0)<=0):
+            raise ValueError('handoff contours must be strictly nested in width and height')
+        if probes.shape!=(3,2) or not np.isfinite(probes).all():
+            raise ValueError('validation_probes_m requires three finite [x,y] pairs')
+        start=int(round((-.5*run['film_width_m']+.5*nx*dx)/dx))
+        stop=int(round((.5*run['film_width_m']+.5*nx*dx)/dx))
+        if stop<=start or start<3 or stop>nx-3:
+            raise ValueError('film must resolve complete bins with three-cell side margins')
+        film_extent=max(abs(-.5*nx*dx+start*dx),abs(-.5*nx*dx+stop*dx))
+        if np.any(contours[:,0]<=film_extent):
+            raise ValueError('handoff contours must enclose the actual complete film bins')
+        padding=max(run['sponge_cells'],run.get('pml_cells',0))
+        for index,(half_width,height) in enumerate(contours):
+            surface=upper_rectangle(half_width,height,2*dx)
+            _check_interpolation_template(surface['x_m'],surface['y_m'],x,y,padding,
+                name=f'handoff contour {index}')
+            surfaces.append(surface)
+        if not np.all((abs(probes[:,0])>contours[-1,0])|(probes[:,1]>contours[-1,1])):
+            raise ValueError('validation probes must lie outside all three handoff contours')
+        px=np.r_[px,probes[:,0]]
+        py=np.r_[py,probes[:,1]]
+        _check_interpolation_template(px,py,x,y,padding,name='power probe')
+    else:
+        # Historical pulse domains need only their own thirteen probes; they
+        # do not export the power case's handoff surfaces or exterior probes.
+        _check_interpolation_template(px,py,x,y,0,name='pulse probe')
+    return px,py,surfaces
 
 
 def prepare_strip_case(parameters, base=None):
-    p={**DEFAULTS,**deepcopy(parameters)}
+    p={**deepcopy(DEFAULTS),**deepcopy(parameters)}
     name=valid_name(p.get('name','finite_strip'))
     if p['kind'] not in ('power','pulse'):
         raise ValueError('strip kind must be power or pulse')
@@ -72,6 +131,11 @@ def prepare_strip_case(parameters, base=None):
              actual_duration_s=steps*m.lattice.dt_s,
              sponge_cells=int(round(p['sponge_width_m']/p['dx_m'])),
              pml_cells=int(round(p['pml_width_m']/p['dx_m'])))
+    if p['pml_width_m'] and not 3<=p['pml_cells']<min(ny,nx//2):
+        raise ValueError('PML requires 3 <= cells < min(ny,nx//2) on the actual grid')
+    if not 0<=p['sponge_cells']<=min(ny,nx//2):
+        raise ValueError('sponge cells must fit the actual domain dimensions')
+    _observation_geometry(p,nx,ny)
     c['strip']=p
     return c
 
@@ -107,15 +171,7 @@ def collect_strip(solver,run):
     initial_mass,initial_energy=_totals(solver)
     theta0=m.theta_ref_lu; rho0=m.lattice.rho_ref_lu
     pressure0=rho0*theta0*m.pressure_scale
-    # The two endpoints are near the symmetry plane, not on an extrapolated row.
-    angles=np.linspace(.04,np.pi-.04,13)
-    px=run['probe_radius_m']*np.cos(angles)
-    py=run['probe_radius_m']*np.sin(angles)
-    py=np.maximum(py,solver.y_m[0])
-    if run['kind']=='power':
-        # Exterior to all three handoff contours, but inside the active gas.
-        px=np.r_[px,0.,-.00078,.00078]
-        py=np.r_[py,.00028,.0001,.0001]
+    px,py,surfaces=_observation_geometry(run,solver.nx,solver.ny)
     records={key:[] for key in ('t_s','pressure_perturbation_Pa','velocity_x_m_s',
         'velocity_y_m_s','gas_mass_lu','gas_energy_J_m','audit','film_temperature_K',
         'film_wall_energy_J_m2','film_input_energy_J_m','film_leak_energy_J_m',
@@ -131,20 +187,9 @@ def collect_strip(solver,run):
     power_integral=leak_integral=0.
     max_film_residual=0.
     max_wall_mass=0.
-    surface_records=[]; surface_times=[]; surfaces=[]; surface_slices=[]
+    surface_records=[]; surface_times=[]; surface_slices=[]
     stationary_history=[]
     if run['kind']=='power':
-        from farfield.strip_surface import upper_rectangle
-        # Each contour is wholly inside the gas domain and outside the film.
-        for half_width,height in ((.00065,.00015),(.0007,.0002),(.00075,.00025)):
-            if half_width>=max(solver.x_m) or height>=max(solver.y_m):
-                raise ValueError('power domain does not contain all three handoff contours')
-            margin=max(run['sponge_cells'],run.get('pml_cells',0))*m.lattice.dx_m
-            if (half_width<=max(abs(solver.film_x_min_m),abs(solver.film_x_max_m))
-                    or half_width>=.5*solver.nx*m.lattice.dx_m-margin
-                    or height>=solver.ny*m.lattice.dx_m-margin):
-                raise ValueError('handoff contours must enclose film and stay outside sponge/PML')
-            surfaces.append(upper_rectangle(half_width,height,2*m.lattice.dx_m))
         count=0
         for surface in surfaces:
             surface_slices.append((count,count+len(surface['x_m'])))
@@ -329,6 +374,7 @@ def summarize_strip(data,config):
 def run_strip_case(effective,output):
     """Run only a new directory and retain failed-run status under four-file contract."""
     from core.finite_strip_solver import FiniteStripSolver
+    from simulation.provenance import capture_numba_runtime
     c=deepcopy(effective); run=c['strip']; output=Path(output).resolve()
     if output.exists():
         raise FileExistsError(f'case already exists: {output}')
@@ -339,11 +385,12 @@ def run_strip_case(effective,output):
         pml_alpha_Hz=run.get('pml_alpha_Hz',1000.))
     run.update(actual_film_x_min_m=float(solver.film_x_min_m),
                actual_film_x_max_m=float(solver.film_x_max_m))
+    runtime=capture_numba_runtime(solver.nx*solver.ny)
     manifest=dict(status='running',created_utc=datetime.now(timezone.utc).isoformat(),
         finished_utc=None,**source,geometry='2D infinite strip, upper symmetric half-space',
         collision_backend='numba',phase_convention='exp(+i omega t)',
         pressure='direct gas pressure',film_edge='adiabatic, no electrodes/support solids',
-        exit=solver.boundary_model,
+        exit=solver.boundary_model,runtime=runtime,runtime_started=deepcopy(runtime),
         boundary_validation_passed=None)
     output.mkdir(parents=True,exist_ok=False)
     (output/'effective.yaml').write_text(yaml.safe_dump(c,allow_unicode=True),encoding='utf-8')
@@ -375,6 +422,7 @@ def run_strip_case(effective,output):
         raise
     finally:
         manifest.update(finished_utc=datetime.now(timezone.utc).isoformat(),elapsed_s=time.perf_counter()-started)
+        manifest['runtime']=capture_numba_runtime(solver.nx*solver.ny)
         dump(output/'manifest.json',manifest)
 
 

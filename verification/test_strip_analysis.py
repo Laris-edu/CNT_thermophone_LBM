@@ -21,8 +21,12 @@ def analysis_api():
 
 @pytest.fixture
 def hankel_case():
+    return _manufactured_hankel_case()
+
+
+def _manufactured_hankel_case(**parameters):
     config = prepare_strip_case(dict(name='manufactured_only', kind='power', dx_m=2e-6,
-        sponge_width_m=0., sponge_rate=0., pml_width_m=.0002))
+        sponge_width_m=0., sponge_rate=0., **{'pml_width_m':.0002,**parameters}))
     m = create_unit_mapping(config)
     f = config['strip']['frequency_Hz']; w = 2*np.pi*f; k = w/m.physical.c0_m_s
     t = (np.arange(1, 321)/32+.37)/f  # Deliberately nonzero absolute phase origin.
@@ -37,8 +41,7 @@ def hankel_case():
         radial = -1j*factor*hankel2(1, k*r)/(m.physical.rho0_kg_m3*m.physical.c0_m_s)
         return p, radial*rx/r, radial*ry/r
 
-    surfaces = [upper_rectangle(a, b, 5e-6) for a, b in
-                ((.00065, .00015), (.0007, .0002), (.00075, .00025))]
+    surfaces = [upper_rectangle(a, b, 5e-6) for a, b in config['strip']['handoff_contours_m']]
     geometry = {key: np.concatenate([s[key] for s in surfaces]) for key in surfaces[0]}
     sizes = np.array([len(s['x_m']) for s in surfaces]); ends = np.cumsum(sizes)
     slices = np.column_stack((np.r_[0, ends[:-1]], ends))
@@ -48,7 +51,8 @@ def hankel_case():
     fields = np.stack((np.real(wave*p), np.real(wave*ux), np.real(wave*uy),
         T0+np.zeros_like(wave.real*p.real), rho0+np.real(wave*p)/m.physical.c0_m_s**2), axis=-1)
     # An inner circular observation is retained, but must never validate all Gamma.
-    px = np.array([0., 0., -.00078, .00078]); py = np.array([.0001, .00028, .0001, .0001])
+    exterior = np.asarray(config['strip']['validation_probes_m'])
+    px = np.r_[0.,exterior[:,0]]; py = np.r_[.0001,exterior[:,1]]
     direct, _, _ = hats(px, py)
     T_hat = np.array([.03+.02j, .02-.01j, .015+.009j, .025-.005j])
     q_hat = np.array([4+3j, 2-3j, 3+1j, 5-.8j])
@@ -136,6 +140,76 @@ def test_valid_export_uses_measured_p_and_u_and_reports_snapped_observers(tmp_pa
     assert np.count_nonzero(actual['observer_role']=='interior_cancel') >= 1
     with pytest.raises(FileExistsError):
         api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox')
+
+
+def test_reduced_export_separates_propagation_observers_from_direct_lbm_probes(tmp_path):
+    api=analysis_api()
+    data,config,summary,boundary,_=_manufactured_hankel_case(height_m=.0002,
+        pml_width_m=.00008,probe_radius_m=.000075,
+        handoff_contours_m=[[.00085,.00009],[.00090,.00010],[.00091,.00011]],
+        validation_probes_m=[[0.,.000115],[-.000915,.00005],[.000915,.00005]])
+    result,arrays=api.analyze_data(data,config,summary,boundary)
+    assert result['source_validation_passed']
+    result['provenance']={'fixture':'manufactured, not LBM','raw_sha256':{'trajectory.npz':'a'*64}}
+    original_analysis=json.dumps(result,sort_keys=True)
+    original_arrays={key:value.copy() for key,value in arrays.items()}
+    output=tmp_path/'reduced_source.mat'
+    api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox')
+    actual=loadmat(output,squeeze_me=True)
+    dx=float(actual['dx_m'])
+    assert dx==.00005
+    sx=np.atleast_1d(actual['expected_grid_observer_x_m'])
+    sy=np.atleast_1d(actual['expected_grid_observer_y_m'])
+    roles=np.atleast_1d(actual['observer_role'])
+    exterior=roles!='interior_cancel'
+    width,height=config['strip']['handoff_contours_m'][1]
+    requested_gap=np.hypot(np.maximum(abs(np.atleast_1d(actual['observer_x_m'])[:3])-width,0.),
+        np.maximum(abs(np.atleast_1d(actual['observer_y_m'])[:3])-height,0.))
+    assert np.all(requested_gap>=3*dx-1e-12)
+    gap=np.hypot(np.maximum(abs(sx)-width,0.),np.maximum(abs(sy)-height,0.))
+    assert np.all(gap[exterior]>=2*dx-1e-12), 'snapped exterior observers overlap or approach the source curve'
+    assert roles[:3].tolist()==['exterior_propagation_check']*3
+    assert roles[3]=='farfield_45mm' and np.isclose(sy[3],.045)
+    np.testing.assert_allclose(sx[4:],[0.,-.0004,.0004],rtol=0,atol=1e-14)
+    np.testing.assert_allclose(sy[4:],0.,rtol=0,atol=1e-14)
+    reference=np.atleast_1d(actual['expected_grid_kirchhoff_p_hat_Pa'])
+    assert np.isfinite(reference).all() and np.all(abs(reference[exterior])>1e-6)
+    r=np.hypot(sx[exterior]-.0001,sy[exterior])
+    expected=.02*np.exp(.63j)*hankel2(0,2*np.pi*actual['frequency_Hz']/actual['c0_m_s']*r)
+    np.testing.assert_allclose(reference[exterior],expected,rtol=.002,atol=1e-8)
+    # Independently enumerate all pressure and staggered-velocity deposition
+    # stencil indices from the MATLAB adapter, even zero-weight neighbours.
+    x0,y0=-float(actual['domain_half_width_m']),-float(actual['domain_half_height_m'])
+    observer_indices=set(zip(np.rint((sx[exterior]-x0)/dx).astype(int),
+                             np.rint((sy[exterior]-y0)/dx).astype(int)))
+    for shift_x,shift_y in ((0.,0.),(.5*dx,0.),(0.,.5*dx)):
+        ix=np.floor((actual['x_m']-x0-shift_x)/dx).astype(int)
+        iy=np.floor((actual['y_m']-y0-shift_y)/dx).astype(int)
+        support={(int(x+i),int(y+j)) for x,y in zip(ix,iy) for i,j in ((0,0),(0,1),(1,0),(1,1))}
+        assert observer_indices.isdisjoint(support)
+    selected=arrays['validation_probe_indices']
+    np.testing.assert_array_equal(actual['nearfield_direct_x_m'],data['probe_x_m'][selected])
+    np.testing.assert_array_equal(actual['nearfield_direct_y_m'],data['probe_y_m'][selected])
+    np.testing.assert_array_equal(actual['nearfield_direct_p_hat_Pa'],arrays['direct_probe_p_hat_Pa'][selected])
+    assert json.loads(str(actual['source_analysis_json']))['provenance']==result['provenance']
+    assert 'not direct LBM observations' in str(actual['observer_reference_note'])
+    assert json.dumps(result,sort_keys=True)==original_analysis
+    for key,value in arrays.items():
+        np.testing.assert_array_equal(value,original_arrays[key])
+
+
+def test_export_keeps_exterior_positions_already_clear_of_source_deposition(tmp_path):
+    api=analysis_api()
+    probes=[[0.,.0004],[-.0009,.0001],[.0009,.0001]]
+    data,config,summary,boundary,_=_manufactured_hankel_case(pml_width_m=0.,
+        validation_probes_m=probes)
+    result,arrays=api.analyze_data(data,config,summary,boundary)
+    assert result['source_validation_passed']
+    output=tmp_path/'clear_source.mat'
+    api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox')
+    actual=loadmat(output,squeeze_me=True)
+    np.testing.assert_array_equal(np.column_stack((actual['observer_x_m'][:3],
+        actual['observer_y_m'][:3])),probes)
 
 
 def test_missing_first_part_of_eight_cycle_observation_does_not_certify(hankel_case):

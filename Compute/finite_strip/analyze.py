@@ -363,11 +363,28 @@ def export_kwave_input(path, result, arrays, *, toolbox_path):
                                  arrays['surface_ux_hat_m_s'][a:b], arrays['surface_uy_hat_m_s'][a:b])
     indices = np.asarray(arrays['validation_probe_indices'], dtype=int)
     px, py = arrays['probe_x_m'][indices], arrays['probe_y_m'][indices]
-    ox, oy = np.r_[px, 0., 0., -.0004, .0004], np.r_[py, .045, 0., 0., 0.]
     dx, half_x, half_y = .00005, .004, .049
+    # Direct LBM probes may lie closer to Gamma than the propagation grid can
+    # resolve. Keep their measured data below; move only propagation checks
+    # along the outward vector from the nearest point on the Gamma 2 rectangle.
+    width, height = np.max(abs(upper['x_m'])), np.max(upper['y_m'])
+    anchor_x, anchor_y = np.clip(px, -width, width), np.clip(py, -height, height)
+    outward_x, outward_y = px-anchor_x, py-anchor_y
+    clearance = np.hypot(outward_x, outward_y)
+    if np.any(clearance <= 0):
+        raise ValueError('propagation checks require direct probes exterior to Gamma 2')
+    outward_scale = np.maximum(1., 3*dx/clearance)
+    exterior_x, exterior_y = anchor_x+outward_scale*outward_x, anchor_y+outward_scale*outward_y
+    ox, oy = np.r_[exterior_x, 0., 0., -.0004, .0004], np.r_[exterior_y, .045, 0., 0., 0.]
     # Match MATLAB round for nonnegative grid indices, not Python's ties-to-even.
     sx = -half_x+np.floor((ox+half_x)/dx+.5)*dx
     sy = -half_y+np.floor((oy+half_y)/dx+.5)*dx
+    snapped_clearance = np.hypot(np.maximum(abs(sx[:len(indices)])-width, 0.),
+                                 np.maximum(abs(sy[:len(indices)])-height, 0.))
+    # Bilinear deposition reaches one cell on each staggered lattice. The
+    # three-cell requested margin leaves at least two after observer snapping.
+    if np.any(snapped_clearance < 2*dx-1e-14):
+        raise ValueError('snapped propagation observers approach the deposited source')
     rho0, c0 = result['air']['rho0_kg_m3'], result['air']['c0_m_s']
     reference = _propagate(closed, sx, sy, frequency=result['frequency_Hz'], rho0=rho0, c0=c0)
     payload = dict(**closed, rho0_kg_m3=rho0, c0_m_s=c0, frequency_Hz=result['frequency_Hz'],
@@ -375,14 +392,17 @@ def export_kwave_input(path, result, arrays, *, toolbox_path):
         pml_size=32, evaluation_cycles=8.25, ramp_cycles=3., record_cycles=2., cfl=.3,
         toolbox_path=str(Path(toolbox_path).resolve()), source_validation_passed=1,
         propagation_validation_performed=0, observer_x_m=ox, observer_y_m=oy,
-        observer_role=np.array(['nearfield']*len(indices)+['farfield_45mm']+['interior_cancel']*3, dtype=object),
+        observer_role=np.array(['exterior_propagation_check']*len(indices)+['farfield_45mm']+['interior_cancel']*3, dtype=object),
+        exterior_observer_requested_clearance_m=3*dx, exterior_observer_minimum_snapped_clearance_m=2*dx,
         expected_grid_observer_x_m=sx, expected_grid_observer_y_m=sy,
         expected_grid_kirchhoff_p_hat_Pa=reference,
         interior_cancel_target_Pa=0., nearfield_direct_x_m=px, nearfield_direct_y_m=py,
         nearfield_direct_p_hat_Pa=arrays['direct_probe_p_hat_Pa'][indices],
         nearfield_direct_probe_indices=indices, contour_index=2,
         phase_convention='exp(+i omega t), original LBM clock, no gain or phase adjustment',
-        observer_reference_note='Kirchhoff reference uses snapped coordinates; LBM direct phasors use saved actual coordinates.',
+        observer_reference_note='Exterior propagation checks are independent Kirchhoff propagation comparisons, '
+            'not direct LBM observations. The reference uses snapped coordinates; '
+            'nearfield_direct coordinates and phasors remain the saved actual LBM measurements.',
         normalization_note='Measured p and normal u; adapter applies source normalization. No extra factor two.',
         source_analysis_json=json.dumps(result, ensure_ascii=False, allow_nan=False))
     path.parent.mkdir(parents=True, exist_ok=True)

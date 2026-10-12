@@ -6,6 +6,7 @@ use float64 and strict floating-point arithmetic (no fastmath). Large fields
 parallelize independent cells; small fields retain the serial kernels.
 """
 import math
+import os
 
 import numpy as np
 from numba import get_num_threads, njit, prange
@@ -16,7 +17,19 @@ from core.macroscopic import MacroState
 
 # Thread overhead did not pay off in short <=65k-cell checks; the r2 field did.
 # This is a conservative dispatch threshold, not a change to collision physics.
-PARALLEL_MIN_CELLS = 262144
+def _parallel_threshold():
+    value = os.environ.get('CNT_LBM_PARALLEL_MIN_CELLS', '262144')
+    try:
+        threshold = int(value)
+    except ValueError as exc:
+        raise ValueError('CNT_LBM_PARALLEL_MIN_CELLS must be a positive integer') from exc
+    if threshold < 1:
+        raise ValueError('CNT_LBM_PARALLEL_MIN_CELLS must be a positive integer')
+    return threshold
+
+
+# Explicit process-level override; it changes dispatch, never arithmetic.
+PARALLEL_MIN_CELLS = _parallel_threshold()
 
 
 @njit(cache=True, fastmath=False, nogil=True, error_model='numpy')
