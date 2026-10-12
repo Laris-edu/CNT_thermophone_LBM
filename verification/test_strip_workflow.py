@@ -40,6 +40,24 @@ def test_short_pulse_writes_four_files_and_refuses_overwrite(tmp_path):
         run_strip_case(small_case(), output)
 
 
+def test_short_spatial_film_coupling_keeps_every_energy_interval(tmp_path):
+    config=prepare_strip_case(dict(name='film_smoke',kind='power',dx_m=1e-5,cycles=.02,
+        sponge_width_m=0.,sponge_rate=0.,stop_when_stable=False))
+    result=run_strip_case(config,tmp_path/'film')
+    assert result['state_validation_passed']
+    assert result['film_energy_check_applicable']
+    assert result['periodic_response_stable'] is False
+    with np.load(tmp_path/'film/trajectory.npz') as data:
+        assert len(data['audit_t_s'])==config['strip']['steps']
+        assert len(data['t_s'])<len(data['audit_t_s'])
+        assert data['film_temperature_K'].shape[1]==100
+        assert np.all(data['film_temperature_K'][-1]>300)
+        assert data['surface_fields'].shape[2]==4
+        assert abs(data['film_storage_J_m'][-1]+2*(data['gas_energy_J_m'][-1]-data['initial_gas_energy_J_m'])
+            -np.sum(data['film_input_energy_J_m'])
+            -2*np.sum(data['audit'][:,list(data['audit_columns']).index('outer_energy_J_m')]))<1e-10
+
+
 def test_pulse_comparison_does_not_call_small_difference_a_reflection_measurement():
     t=np.linspace(0,1e-5,101)
     ref=np.exp(-((t-1e-6)/3e-7)**2)[:,None]*np.array([[1.,.5]])
