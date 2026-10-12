@@ -1,0 +1,55 @@
+# Finite 1 mm strip, invariant in z; all powers are per area or per z length.
+base_config: ../open_planar/e1_long_air.yaml
+defaults:
+  width_m: 0.002
+  height_m: 0.0005
+  film_width_m: 0.001
+  frequency_Hz: 20000.0
+  mean_power_W_m2: 1255.5555555555557
+  C_A_J_m2K: 0.012888
+  sheet_conductance_W_K: 5.7996e-7
+  G_W_m2K: 0.0
+  initial_temperature_K: 300.0
+  cycles: 24
+  stop_when_stable: true
+  field_samples_per_cycle: 32
+  sponge_width_m: 0.0001
+  sponge_rate: 0.05
+material:
+  description: Literature-constructed aligned porous CNT equivalent sheet; not a measured specimen.
+  source: https://doi.org/10.1021/nn507117a
+  supplement: https://pstorage-acs-6854636.s3.amazonaws.com/3798106/nn507117a_si_001.pdf
+  source_section: S4.1
+  thickness_m: 18e-6
+  apparent_density_kg_m3: 1.0
+  adopted_specific_heat_J_kgK: 716.0
+  along_alignment_diffusivity_m2_s: 45e-6
+  assumption: Zero-thickness impermeable effective wall; no pore-scale exchange, electrode, or support model.
+cases:
+  - name: pulse_candidate_dx10um
+    kind: pulse
+    film_width_m: 0.0
+    dx_m: 1.0e-5
+    duration_s: 8.0e-6
+    pulse_sigma_m: 7.5e-5
+    pulse_amplitude_Pa: 1.0
+    probe_radius_m: 0.00025
+  - name: pulse_reference_dx10um
+    kind: pulse
+    film_width_m: 0.0
+    dx_m: 1.0e-5
+    width_m: 0.004
+    height_m: 0.002
+    duration_s: 8.0e-6
+    pulse_sigma_m: 7.5e-5
+    pulse_amplitude_Pa: 1.0
+    probe_radius_m: 0.00025
+  - name: power_r2
+    kind: power
+    dx_m: 1.305875e-6
+validation:
+  pulse_return_start_s: 1.8e-6
+  pulse_return_error_limit: 0.01
+  propagation_amplitude_relative: 0.01
+  propagation_phase_deg: 1.0
+  note: A passed coarse broadband pulse is insufficient for 20 kHz or thermoviscous grid validation.

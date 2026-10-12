@@ -26,6 +26,21 @@
 闭域热流换算声压、开放域直接恢复声压、二维远场外推声压，必须分别标明来源。
 不能用其中一项通过测试，推断有限尺寸 CNT 器件的全部响应已验证。
 
+有限条膜的实验入口为 `core.finite_strip_solver.FiniteStripSolver` 与
+`simulation.finite_strip`。它复用 D2Q37 局部输运，底边膜内逐段漫反射、膜外镜面对称，
+以 `coupling.finite_strip.solve_strip_film_midpoint` 解沿膜导热与双侧实际交换。
+数组仍为 `(ny,nx,Q)`；气体域在上半空间，第三方向无限长，总能量为 J/m。
+顶部和左右边界的局部法向特征条件与显式记账吸收层尚需二维反射验证；
+数值完成、正性和能量闭合不能代替该验证。原平面入口与默认值不变。
+
+`Compute/finite_strip/study.yaml` 配置 1 mm 膜宽、0.5 mm 上半域候选及大域脉冲对照，
+用 `python -m Compute.finite_strip.run --batch <新批次> --dry-run` 检查展开参数；
+`--case <名称>` 单独执行，`--compare-pulses` 比较保存的候选/参考脉冲。
+功率计算先受脉冲门禁约束，之后仍需 20 kHz、网格、域长和闭合线稳定性检查。
+`farfield.strip_surface` 按压力/切向速度偶对称、法向速度奇对称补齐闭合线；
+`Compute/finite_strip/kwave_handoff.m` 将其转换为 k-Wave 质量源与力源。
+该适配器的独立声源测试不等于 LBM 近场或有限条膜链路验证。
+
 ## 2. 公共代码导航
 
 | 目录 / 文件 | 封装的职责 | 通常何时使用 |
