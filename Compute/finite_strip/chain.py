@@ -1,8 +1,9 @@
-"""Run the authorized long nearfield calculation, then propagate only a passed source.
+"""Run the nearfield/propagation chain, with an explicit saved-source diagnostic mode.
 
 This is immediate case orchestration, not a scheduler. Existing cases and final
 outputs are never overwritten. A failed state, nearfield, or propagation gate
-stops the chain without changing tolerances or launching another scan.
+stops the normal chain without changing tolerances or launching another scan.
+Diagnostic propagation preserves failed checks and uses separate output names.
 """
 import argparse
 import hashlib
@@ -14,7 +15,7 @@ import numpy as np
 import yaml
 from scipy.io import loadmat
 
-from Compute.finite_strip.analyze import main as analyze_main
+from Compute.finite_strip.analyze import main as analyze_main,analyze_saved,export_kwave_input
 from Compute.finite_strip.run import load_cases,validate_boundary_evidence
 from farfield.kirchhoff_2d import kirchhoff_2d_frequency,dpdn_from_velocity,GREEN_OUTGOING
 from postproc.multiharmonic_fit import fit_multiharmonic
@@ -25,6 +26,12 @@ from simulation.study import ROOT,valid_name
 
 def validate_propagation(source,result):
     """Compare actual k-Wave coordinates/phasors with independent Kirchhoff."""
+    diagnostic=bool(source.get('diagnostic_mode',0)==1)
+    source_passed=bool(source['source_validation_passed']==1)
+    if diagnostic and (result.get('diagnostic_mode')!=1
+                       or result.get('source_validation_passed')!=int(source_passed)
+                       or result.get('source_validation_bypassed')!=int(not source_passed)):
+        raise ValueError('k-Wave diagnostic/source validation metadata differs from input')
     x,y=(np.atleast_1d(result['observer_'+a+'_m']).ravel() for a in ('x','y'))
     for a,actual in zip(('x','y'),(x,y)):
         if not np.allclose(actual,np.atleast_1d(source['expected_grid_observer_'+a+'_m']).ravel(),
@@ -87,6 +94,7 @@ def validate_propagation(source,result):
         timeseries_matches_reported_phase=signal_phase<=1.,timeseries_interior_cancellation=signal_leak<=.01)
     far=np.flatnonzero(roles=='farfield_45mm')
     return dict(status='completed',source_validation_passed=checks['source_validation'],
+        diagnostic_mode=diagnostic,source_validation_bypassed=bool(diagnostic and not source_passed),
         propagation_validation_passed=all(checks.values()),checks=checks,
         max_amplitude_error_relative=amp,max_phase_error_deg=phase,interior_leakage_relative=leakage,
         period_amplitude_change_relative=window_amp,period_phase_change_deg=window_phase,
@@ -103,13 +111,21 @@ def validate_propagation(source,result):
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(__doc__)
+    parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--batch',required=True)
     parser.add_argument('--study',type=Path,default=Path(__file__).with_name('study.yaml'))
     parser.add_argument('--stage',choices=('all','propagate'),default='all')
     parser.add_argument('--matlab',type=Path,default=Path('E:/Matlab/bin/matlab.exe'))
     parser.add_argument('--toolbox',type=Path,default=ROOT/'k-wave-toolbox-version-1.4.1')
+    parser.add_argument('--diagnostic',action='store_true',
+        help='Propagate a saved stable source despite its direct-pressure comparison failure; retain failed validation.')
+    parser.add_argument('--matlab-threads',type=int,
+        help='Requested MATLAB computational threads; does not change the numerical grid or source.')
     args=parser.parse_args(argv)
+    if args.diagnostic and args.stage!='propagate':
+        parser.error('--diagnostic requires --stage propagate; it cannot start LBM')
+    if args.matlab_threads is not None and args.matlab_threads<1:
+        parser.error('--matlab-threads must be positive')
     root=args.study.resolve().parent/valid_name(args.batch)
     case=root/'raw/power_r2'
     if args.stage=='all':
@@ -135,40 +151,56 @@ def main(argv=None):
     # Fail dependency and overwrite checks before the many-hour LBM run.
     if not args.matlab.is_file() or not (args.toolbox/'kspaceFirstOrder2D.m').is_file():
         raise FileNotFoundError('MATLAB executable or k-Wave entry point is missing')
-    outputs=[root/'final'/name for name in ('power_r2_nearfield.json','power_r2_nearfield.npz',
-                 'power_r2_kwave_input.mat','power_r2_kwave_output.mat','propagation_validation.json')]
+    prefix='power_r2_kwave_diagnostic' if args.diagnostic else 'power_r2_kwave'
+    incoming=root/'final'/f'{prefix}_input.mat'
+    outgoing=root/'final'/f'{prefix}_output.mat'
+    target=root/'final'/('propagation_diagnostic.json' if args.diagnostic else 'propagation_validation.json')
+    outputs=[incoming,outgoing,target]
+    if not args.diagnostic:
+        outputs += [root/'final'/name for name in ('power_r2_nearfield.json','power_r2_nearfield.npz')]
     for path in ([case] if args.stage=='all' else [])+outputs:
         if path.exists():
             raise FileExistsError(path)
     quote=lambda path:"'"+Path(path).resolve().as_posix().replace("'","''")+"'"
-    probe=f"addpath({quote(args.toolbox)});assert(~isempty(which('kspaceFirstOrder2D')));disp('MATLAB/k-Wave preflight passed')"
+    thread_setting='' if args.matlab_threads is None else f'maxNumCompThreads({args.matlab_threads});'
+    probe=thread_setting+f"addpath({quote(args.toolbox)});assert(~isempty(which('kspaceFirstOrder2D')));disp('MATLAB/k-Wave preflight passed')"
     if args.stage=='all':
         subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
         print(json.dumps(dict(stage='power',output=str(case),exists=case.exists(),
             nx=config['numerics']['nx'],ny=config['numerics']['ny'],steps=config['strip']['steps'],
             dt_s=config['lattice']['dt_s']),indent=2),flush=True)
         run_strip_case(config,case)
-    status=analyze_main(['--batch',str(root),'--case','power_r2','--export-kwave','--toolbox',str(args.toolbox)])
-    if status:
-        print('Nearfield/source gate failed; diagnostics saved and propagation not started.',flush=True)
-        return status
+    if args.diagnostic:
+        # Re-read the immutable saved run. Existing failed analysis remains intact.
+        analysis,arrays=analyze_saved(case)
+        export_kwave_input(incoming,analysis,arrays,toolbox_path=args.toolbox,diagnostic=True)
+        print(json.dumps(dict(stage='diagnostic_propagation',
+            source_validation_passed=analysis['source_validation_passed'],
+            failed_source_checks=[key for key,ok in analysis['checks'].items() if not ok],
+            input=str(incoming),output=str(outgoing)),indent=2),flush=True)
+    else:
+        status=analyze_main(['--batch',str(root),'--case','power_r2','--export-kwave','--toolbox',str(args.toolbox)])
+        if status:
+            print('Nearfield/source gate failed; diagnostics saved and propagation not started.',flush=True)
+            return status
     if args.stage=='propagate':
         subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
-    incoming=root/'final/power_r2_kwave_input.mat'
-    outgoing=root/'final/power_r2_kwave_output.mat'
     if outgoing.exists():
         raise FileExistsError(outgoing)
-    command=f'addpath({quote(Path(__file__).parent)});kwave_handoff({quote(incoming)},{quote(outgoing)})'
+    command=thread_setting+f'addpath({quote(Path(__file__).parent)});kwave_handoff({quote(incoming)},{quote(outgoing)})'
     subprocess.run([str(args.matlab),'-batch',command],cwd=ROOT,check=True)
     result=validate_propagation(loadmat(incoming,squeeze_me=True),loadmat(outgoing,squeeze_me=True))
     result['input_sha256']=hashlib.sha256(incoming.read_bytes()).hexdigest()
     result['output_sha256']=hashlib.sha256(outgoing.read_bytes()).hexdigest()
-    target=root/'final/propagation_validation.json'
+    result['adapter_sha256']=hashlib.sha256(Path(__file__).with_name('kwave_handoff.m').read_bytes()).hexdigest()
+    result['matlab_threads_requested']=args.matlab_threads
+    if args.diagnostic:
+        result['execution_scope']='User-requested diagnostic propagation; failed source/interior checks remain failed.'
     if target.exists():
         raise FileExistsError(target)
     dump(target,result)
     print(json.dumps(result,indent=2),flush=True)
-    return 0 if result['propagation_validation_passed'] else 3
+    return 0 if args.diagnostic or result['propagation_validation_passed'] else 3
 
 
 if __name__=='__main__':

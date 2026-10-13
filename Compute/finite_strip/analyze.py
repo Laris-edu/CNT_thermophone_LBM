@@ -350,9 +350,24 @@ def analyze_saved(case_dir, boundary_path=None):
     return result, arrays
 
 
-def export_kwave_input(path, result, arrays, *, toolbox_path):
-    """Export measured Gamma 2 p/u_n only after every source gate passes."""
-    if result.get('source_validation_passed') is not True or not all(result.get('checks', {}).values()):
+def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False):
+    """Export Gamma 2; explicit diagnostics may bypass only its direct check."""
+    checks = result.get('checks', {})
+    if diagnostic:
+        required = {'run_completed', 'state_validation', 'boundary_prerequisite',
+            'complete_eight_cycle_observation', 'observation_time_coverage',
+            'fitted_signals_finite_and_conditioned', 'geometry', 'exterior_probes',
+            'film_stationarity', 'surface_stationarity',
+            'homogeneous_linear_acoustic_applicability', 'kirchhoff_vs_direct',
+            'contour_sensitivity', 'boundary_evidence_bound'}
+        allowed = (result.get('status') == 'completed' and result.get('validation_passed') is True
+            and result.get('source_validation_passed') is False and isinstance(checks, dict)
+            and required.issubset(checks) and checks['kirchhoff_vs_direct'] is False
+            and all(passed is True for name, passed in checks.items() if name != 'kirchhoff_vs_direct'))
+        if not allowed:
+            raise ValueError('diagnostic source validation permits only kirchhoff_vs_direct failure '
+                             'after completed state and every other source check pass')
+    elif result.get('source_validation_passed') is not True or not all(checks.values()):
         raise ValueError('source validation must pass before a k-Wave MAT is created')
     path = Path(path)
     if path.exists():
@@ -390,7 +405,12 @@ def export_kwave_input(path, result, arrays, *, toolbox_path):
     payload = dict(**closed, rho0_kg_m3=rho0, c0_m_s=c0, frequency_Hz=result['frequency_Hz'],
         dx_m=dx, domain_half_width_m=half_x, domain_half_height_m=half_y,
         pml_size=32, evaluation_cycles=8.25, ramp_cycles=3., record_cycles=2., cfl=.3,
-        toolbox_path=str(Path(toolbox_path).resolve()), source_validation_passed=1,
+        toolbox_path=str(Path(toolbox_path).resolve()),
+        source_validation_passed=int(result['source_validation_passed']),
+        diagnostic_mode=int(diagnostic), source_validation_bypassed=int(diagnostic),
+        diagnostic_scope=('Diagnostic export bypasses kirchhoff_vs_direct only; source remains not validated. '
+            'This is not a validated LBM-to-k-Wave chain or 45 mm result.' if diagnostic else
+            'Source checks passed; propagation has not yet been validated.'),
         propagation_validation_performed=0, observer_x_m=ox, observer_y_m=oy,
         observer_role=np.array(['exterior_propagation_check']*len(indices)+['farfield_45mm']+['interior_cancel']*3, dtype=object),
         exterior_observer_requested_clearance_m=3*dx, exterior_observer_minimum_snapped_clearance_m=2*dx,

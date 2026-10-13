@@ -115,6 +115,87 @@ def test_velocity_channel_has_discriminating_power(handoff_results):
     assert interior > 0.5
 
 
+def test_diagnostic_gate_preserves_source_status_and_structural_checks(tmp_path):
+    """Short opt-in gate test; its tiny manufactured field tests no accuracy claim."""
+    if os.environ.get("RUN_KWAVE_GATE_TESTS") != "1":
+        pytest.skip("set RUN_KWAVE_GATE_TESTS=1 for the short MATLAB gate regression")
+    if not MATLAB.is_file() or not TOOLBOX.is_dir():
+        pytest.skip("MATLAB executable and k-Wave toolbox are required")
+    base = _input(0.002)
+    base.update(domain_half_width_m=0.012, domain_half_height_m=0.012,
+                observer_x_m=np.array([0.0]), observer_y_m=np.array([0.010]),
+                evaluation_cycles=3.25, ramp_cycles=1.0, record_cycles=1.0,
+                cfl=0.3, pml_size=4, source_validation_passed=False)
+    cases = {
+        "default_rejected": dict(base),
+        "explicit_rejected": dict(base, diagnostic_mode=0),
+        "diagnostic_reaches_dependency": dict(base, diagnostic_mode=1),
+        "missing_status": dict(base, diagnostic_mode=1),
+        "invalid_status": dict(base, source_validation_passed=2, diagnostic_mode=1),
+        "invalid_mode": dict(base, diagnostic_mode=2),
+        "nonfinite_source": dict(base, diagnostic_mode=1),
+        "open_curve": dict(base, diagnostic_mode=1),
+        "diagnostic_output": dict(base, diagnostic_mode=1),
+        "validated_output": dict(base, source_validation_passed=True),
+    }
+    cases["diagnostic_reaches_dependency"].pop("toolbox_path")
+    cases["missing_status"].pop("source_validation_passed")
+    cases["nonfinite_source"]["p_hat_Pa"] = np.full(256, np.nan)
+    cases["open_curve"]["normal_x"] = np.ones(256)
+    cases["open_curve"]["normal_y"] = np.zeros(256)
+    quote = lambda path: "'" + path.as_posix().replace("'", "''") + "'"
+    statements = [f"addpath({quote(ADAPTER.parent)})"]
+    for name, config in cases.items():
+        incoming, outgoing = tmp_path / f"{name}_in.mat", tmp_path / f"{name}_out.mat"
+        savemat(incoming, config)
+        error_path = tmp_path / f"{name}_error.mat"
+        statements.append(
+            f"failure='';try,kwave_handoff({quote(incoming)},{quote(outgoing)});"
+            f"catch exception,failure=exception.message;end;"
+            f"save({quote(error_path)},'failure','-v7')")
+    options = {}
+    if os.name == "nt":
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = subprocess.SW_HIDE
+        options.update(startupinfo=startup, creationflags=subprocess.CREATE_NO_WINDOW)
+    process = subprocess.Popen([str(MATLAB), "-singleCompThread", "-batch", ";".join(statements)],
+                               cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options)
+    try:
+        stdout, stderr = process.communicate(timeout=90)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                           capture_output=True, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            process.kill()
+        process.communicate()
+        pytest.fail("Short MATLAB gate regression exceeded 90 seconds")
+    log = (stdout + stderr).decode(errors="replace")
+    assert process.returncode == 0, log
+    errors = {name: str(loadmat(tmp_path / f"{name}_error.mat", squeeze_me=True)["failure"])
+              for name in cases}
+    assert "toolbox_path" in errors["diagnostic_reaches_dependency"], errors
+    for name in ("default_rejected", "explicit_rejected"):
+        assert "upstream source must pass" in errors[name], errors
+    for name in ("missing_status", "invalid_status"):
+        assert "source_validation_passed" in errors[name], errors
+    assert "diagnostic_mode" in errors["invalid_mode"], errors
+    assert "finite" in errors["nonfinite_source"], errors
+    assert "normals do not close" in errors["open_curve"], errors
+    assert "DIAGNOSTIC" in log and "source_validation_passed=0" in log, log
+    for name, passed, diagnostic, bypassed in (
+            ("diagnostic_output", False, True, True),
+            ("validated_output", True, False, False)):
+        result = loadmat(tmp_path / f"{name}_out.mat", squeeze_me=True)
+        assert bool(result["source_validation_passed"]) is passed
+        assert bool(result["diagnostic_mode"]) is diagnostic
+        assert bool(result["source_validation_bypassed"]) is bypassed
+        assert np.isfinite(result["observer_p_hat_Pa"]).all()
+    for name in cases.keys() - {"diagnostic_output", "validated_output"}:
+        assert not (tmp_path / f"{name}_out.mat").exists()
+
+
 def run_thin_rectangle_fixture(output_directory: Path, *, dx_m: float,
                                pml_size: int = 20, domain_half_height_m: float = 0.05,
                                evaluation_cycles: float = 10.25) -> dict:

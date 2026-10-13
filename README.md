@@ -104,6 +104,15 @@ LBM 的直接探针仍使用保存的原坐标；k-Wave 的 50 μm 网格不能�
 原始云端数据与本机分析的源码身份分别记录，避免 Windows/Linux 行尾差异被误当作
 同一原始字节；不改写已保存的哈希或四文件。已有分析/传播文件仍拒绝覆盖。
 
+用户明确要求先查看未验证传播时，可对已完成且周期稳定的保存源使用
+`--stage propagate --diagnostic --matlab-threads 4`。该选项仅允许跳过
+`kirchhoff_vs_direct` 的源比较失败，其余状态、几何、周期稳定和边界证据检查仍执行；
+MAT 输入及输出保留 `source_validation_passed=0` 与显式诊断标记。
+结果另存为 `power_r2_kwave_diagnostic_input.mat`、
+`power_r2_kwave_diagnostic_output.mat` 和 `propagation_diagnostic.json`，
+原近场诊断不覆盖。诊断运行退出码 0 仅表示传播执行完成；各项误差和
+`propagation_validation_passed` 仍按原门限如实记录，不代表器件或交接验证通过。
+
 ## 2. 公共代码导航
 
 | 目录 / 文件 | 封装的职责 | 通常何时使用 |

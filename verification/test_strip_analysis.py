@@ -131,6 +131,8 @@ def test_valid_export_uses_measured_p_and_u_and_reports_snapped_observers(tmp_pa
     api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox')
     actual=loadmat(output,squeeze_me=True)
     assert actual['source_validation_passed']==1
+    assert actual['diagnostic_mode']==0
+    assert actual['source_validation_bypassed']==0
     assert actual['dx_m']==.00005 and actual['pml_size']==32
     assert actual['evaluation_cycles']>=8.25
     assert actual['domain_half_width_m']==.004 and actual['domain_half_height_m']==.049
@@ -140,6 +142,71 @@ def test_valid_export_uses_measured_p_and_u_and_reports_snapped_observers(tmp_pa
     assert np.count_nonzero(actual['observer_role']=='interior_cancel') >= 1
     with pytest.raises(FileExistsError):
         api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox')
+
+
+def _phase_mismatched_export(hankel_case):
+    data,config,summary,boundary,want=hankel_case
+    omega=2*np.pi*config['strip']['frequency_Hz']
+    data['pressure_perturbation_Pa']=np.real(
+        np.exp(1j*omega*data['t_s'])[:,None]*want['direct']*np.exp(.05j))
+    result,arrays=analysis_api().analyze_data(data,config,summary,boundary)
+    result['checks']['boundary_evidence_bound']=True
+    assert result['validation_passed'] is True
+    assert [name for name,passed in result['checks'].items() if not passed]==['kirchhoff_vs_direct']
+    assert result['source_validation_passed'] is False
+    return result,arrays
+
+
+def test_diagnostic_export_keeps_failed_source_gate_in_real_mat(tmp_path,hankel_case):
+    api=analysis_api()
+    result,arrays=_phase_mismatched_export(hankel_case)
+    original=json.dumps(result,sort_keys=True)
+    blocked=tmp_path/'normal_blocked.mat'
+    with pytest.raises(ValueError,match='source validation'):
+        api.export_kwave_input(blocked,result,arrays,toolbox_path=tmp_path/'toolbox')
+    assert not blocked.exists()
+    output=tmp_path/'diagnostic.mat'
+    api.export_kwave_input(output,result,arrays,toolbox_path=tmp_path/'toolbox',diagnostic=True)
+    actual=loadmat(output,squeeze_me=True)
+    assert actual['source_validation_passed']==0
+    assert actual['diagnostic_mode']==1
+    assert actual['source_validation_bypassed']==1
+    assert actual['propagation_validation_performed']==0
+    assert 'kirchhoff_vs_direct' in str(actual['diagnostic_scope'])
+    assert 'not validated' in str(actual['diagnostic_scope'])
+    stored=json.loads(str(actual['source_analysis_json']))
+    assert stored['source_validation_passed'] is False
+    assert stored['checks']['kirchhoff_vs_direct'] is False
+    assert json.dumps(result,sort_keys=True)==original
+    a,b=arrays['surface_slices'][1]
+    np.testing.assert_array_equal(actual['p_hat_Pa'][:b-a],arrays['surface_p_hat_Pa'][a:b])
+
+
+@pytest.mark.parametrize('defect',['other_gate','missing_gate','empty_checks','nonmapping_checks',
+                                 'state_failed','state_missing','status_failed','source_unknown'])
+def test_diagnostic_export_rejects_other_or_missing_prerequisites(tmp_path,hankel_case,defect):
+    result,arrays=_phase_mismatched_export(hankel_case)
+    if defect=='other_gate':
+        result['checks']['geometry']=False
+    elif defect=='missing_gate':
+        del result['checks']['geometry']
+    elif defect=='empty_checks':
+        result['checks']={}
+    elif defect=='nonmapping_checks':
+        result['checks']=None
+    elif defect=='state_failed':
+        result['validation_passed']=False
+    elif defect=='state_missing':
+        del result['validation_passed']
+    elif defect=='status_failed':
+        result['status']='failed'
+    else:
+        result['source_validation_passed']=None
+    output=tmp_path/'rejected_diagnostic.mat'
+    with pytest.raises(ValueError,match='source validation'):
+        analysis_api().export_kwave_input(output,result,arrays,
+            toolbox_path=tmp_path/'toolbox',diagnostic=True)
+    assert not output.exists()
 
 
 def test_reduced_export_separates_propagation_observers_from_direct_lbm_probes(tmp_path):
