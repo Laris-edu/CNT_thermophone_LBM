@@ -181,7 +181,7 @@ def _pulse_initialize(solver,run):
     solver.initialize_from_macro(rho,np.zeros((solver.ny,solver.nx,2)),theta)
 
 
-def collect_strip(solver,run):
+def collect_strip(solver,run,*,progress_callback=None):
     """Collect endpoint fields and interval-integrated exchanges, without clipping."""
     m=solver.mapping; dt=m.lattice.dt_s
     if run['kind']=='pulse':
@@ -276,6 +276,17 @@ def collect_strip(solver,run):
                       macro.rho*m.rho_scale)
             surface_records.append(np.stack([_sample_bilinear(v,solver.x_m,solver.y_m,
                 surface_all['x_m'],surface_all['y_m']) for v in channels],axis=-1))
+        if (progress_callback is not None and observed
+                and (len(records['t_s'])%8==1 or step+1==run['steps'])):
+            # Read-only observations of accepted steps, never restart data or
+            # a completed/validated trajectory. No population download.
+            progress={key:np.asarray(records[key]) for key in ('t_s',
+                'film_temperature_K','film_wall_energy_J_m2','pressure_perturbation_Pa')}
+            progress.update(run_completed=False,accepted_steps=step+1,
+                physical_time_s=(step+1)*dt,elapsed_s=time.perf_counter()-start,
+                dt_s=dt,frequency_Hz=run['frequency_Hz'],film_x_m=solver.film_x_m,
+                probe_x_m=px,probe_y_m=py)
+            progress_callback(progress)
         if run['kind']=='power' and (step+1)*dt*run['frequency_Hz']>=next_cycle:
             from postproc.power import stationarity_at_cycle
             state={k:np.asarray(v) for k,v in records.items()}
@@ -391,7 +402,7 @@ def summarize_strip(data,config):
         scope='experimental finite strip; conservation is not open-boundary or device validation')
 
 
-def run_strip_case(effective,output):
+def run_strip_case(effective,output,*,progress_callback=None):
     """Run only a new directory and retain failed-run status under four-file contract."""
     from core.finite_strip_solver import FiniteStripSolver
     from simulation.provenance import (capture_cupy_runtime,capture_numba_runtime,
@@ -422,7 +433,8 @@ def run_strip_case(effective,output):
     dump(output/'summary.json',dict(status='running',validation_passed=None))
     started=time.perf_counter()
     try:
-        data=collect_strip(solver,run)
+        data=(collect_strip(solver,run) if progress_callback is None else
+              collect_strip(solver,run,progress_callback=progress_callback))
         np.savez_compressed(output/'trajectory.npz',**data)
         summary=summarize_strip(data,c)
         dump(output/'summary.json',summary)

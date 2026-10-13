@@ -350,12 +350,17 @@ def analyze_saved(case_dir, boundary_path=None):
     return result, arrays
 
 
-def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False, kwave_backend='cpu'):
-    """Export Gamma 2; explicit diagnostics may bypass only its direct check."""
+def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False,
+                       kwave_backend='cpu', unvalidated=False):
+    """Export Gamma 2; opt-in unvalidated results retain every failed check."""
     if kwave_backend not in ('cpu', 'matlab-gpu'):
         raise ValueError('k-Wave backend must be cpu or matlab-gpu')
     checks = result.get('checks', {})
-    if diagnostic:
+    if unvalidated:
+        usable=('run_completed','fitted_signals_finite_and_conditioned','geometry')
+        if not all(checks.get(name) is True for name in usable):
+            raise ValueError('direct export requires completed usable finite source data and geometry')
+    elif diagnostic:
         required = {'run_completed', 'state_validation', 'boundary_prerequisite',
             'complete_eight_cycle_observation', 'observation_time_coverage',
             'fitted_signals_finite_and_conditioned', 'geometry', 'exterior_probes',
@@ -415,8 +420,11 @@ def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False, 
         toolbox_path=str(Path(toolbox_path).resolve()),
         kwave_backend_requested=kwave_backend,
         source_validation_passed=int(result['source_validation_passed']),
-        diagnostic_mode=int(diagnostic), source_validation_bypassed=int(diagnostic),
-        diagnostic_scope=('Diagnostic export bypasses kirchhoff_vs_direct only; source remains not validated. '
+        diagnostic_mode=int(diagnostic or unvalidated),
+        source_validation_bypassed=int((diagnostic or unvalidated) and not result['source_validation_passed']),
+        diagnostic_scope=('User-requested direct propagation without boundary/source certification; '
+            'all actual check results are retained. This is an unvalidated numerical result.' if unvalidated else
+            'Diagnostic export bypasses kirchhoff_vs_direct only; source remains not validated. '
             'This is not a validated LBM-to-k-Wave chain or 45 mm result.' if diagnostic else
             'Source checks passed; propagation has not yet been validated.'),
         propagation_validation_performed=0, observer_x_m=ox, observer_y_m=oy,

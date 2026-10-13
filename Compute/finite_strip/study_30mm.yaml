@@ -4,8 +4,10 @@ base_config: ../open_planar/e1_long_air.yaml
 
 defaults:
   collision_backend: cupy
-  width_m: 0.031
-  height_m: 0.0002
+  # 30 mm film + 0.5 mm clear gas + 30 * 4 um PML on each side.
+  width_m: 0.03124
+  # Total upper-domain height, including the top PML.
+  height_m: 0.002
   film_width_m: 0.030
   frequency_Hz: 20000.0
   mean_power_W_m2: 1255.5555555555557
@@ -18,7 +20,7 @@ defaults:
   field_samples_per_cycle: 32
   sponge_width_m: 0.0
   sponge_rate: 0.0
-  pml_width_m: 0.00008
+  pml_width_m: 0.00012
   pml_target_return: 0.001
   pml_alpha_Hz: 1000.0
   handoff_contours_m:
@@ -45,50 +47,10 @@ material:
   nominal_mean_total_power_W: 1.13
   assumption: Zero-thickness impermeable effective wall, invariant in z; no finite-z edges, pore-scale exchange, electrode, or support model.
 cases:
-  # The centred pulse first sees side returns near 89 us. The 100 us
-  # window includes them; isolated and reference returns remain outside it.
-  - name: pulse_candidate_dx10um
-    kind: pulse
-    film_width_m: 0.0
-    dx_m: 1.0e-5
-    duration_s: 0.0001
-    pulse_sigma_m: 2.0e-5
-    pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00005
-  - name: pulse_reference_dx10um
-    kind: pulse
-    film_width_m: 0.0
-    dx_m: 1.0e-5
-    width_m: 0.038
-    height_m: 0.019
-    duration_s: 0.0001
-    pulse_sigma_m: 2.0e-5
-    pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00005
-  - name: pulse_sides_dx10um
-    kind: pulse
-    film_width_m: 0.0
-    dx_m: 1.0e-5
-    height_m: 0.018
-    duration_s: 0.0001
-    pulse_sigma_m: 2.0e-5
-    pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00005
-  - name: pulse_top_dx10um
-    kind: pulse
-    film_width_m: 0.0
-    dx_m: 1.0e-5
-    width_m: 0.036
-    duration_s: 0.0001
-    pulse_sigma_m: 2.0e-5
-    pulse_amplitude_Pa: 1.0
-    probe_radius_m: 0.00005
   - name: power_r2
     kind: power
-    dx_m: 1.305875e-6
+    dx_m: 4.0e-6
 validation:
-  pulse_return_start_s: 0.0
-  pulse_return_error_limit: 0.01
   propagation_amplitude_relative: 0.01
   propagation_phase_deg: 1.0
-  note: A passed coarse broadband pulse is insufficient for 20 kHz or thermoviscous grid validation.
+  note: Direct power run requested without pulse prerequisites; grid and boundary validation remain unassessed.
