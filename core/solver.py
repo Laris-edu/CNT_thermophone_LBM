@@ -83,6 +83,8 @@ def write_metadata(group: "h5py.Group", metadata: dict[str, Any]) -> None:
 class GasSolver2D:
     """Periodic 2D Phase_2 gas solver with velocity-last f/g layout."""
 
+    supports_gpu = False
+
     def __init__(self, config: dict[str, Any]):
         self.config = config
         self.case_name = config.get("case", {}).get("name", "phase2_case")
@@ -90,6 +92,8 @@ class GasSolver2D:
         self.lattice: Lattice = make_lattice(self.mapping.lattice.velocity_set)
         numerics = config.get("numerics", {})
         self.collision_backend = validate_collision_backend(numerics.get('collision_backend', 'numpy'))
+        if self.collision_backend == 'cupy' and not self.supports_gpu:
+            raise ValueError('cupy solver backend currently requires FiniteStripSolver')
         self.ny = int(numerics.get("ny", 4))
         self.nx = int(numerics.get("nx", 64))
         self.t_lu = 0

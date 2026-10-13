@@ -308,15 +308,17 @@ def local_transport_coefficients(
     """
     if mapping.transport.mode != "local":
         raise ValueError("local transport coefficients require transport.mode=local")
-    rho, theta = np.broadcast_arrays(np.asarray(rho_lu, dtype=float), np.asarray(theta_lu, dtype=float))
-    if not np.all(np.isfinite(rho) & (rho > 0)):
+    from core.array_backend import array_module
+    xp = array_module(rho_lu, theta_lu)
+    rho, theta = xp.broadcast_arrays(xp.asarray(rho_lu, dtype=float), xp.asarray(theta_lu, dtype=float))
+    if not xp.all(xp.isfinite(rho) & (rho > 0)):
         raise ValueError("local transport requires finite positive density")
-    if not np.all(np.isfinite(theta) & (theta > 0)):
+    if not xp.all(xp.isfinite(theta) & (theta > 0)):
         raise ValueError("local transport requires finite positive temperature")
     tr = theta / mapping.theta_ref_lu
     rho_ratio = rho / mapping.lattice.rho_ref_lu
     if mapping.transport.model == "constant":
-        mu_ratio = k_ratio = np.ones_like(tr)
+        mu_ratio = k_ratio = xp.ones_like(tr)
     elif mapping.transport.model == "sutherland":
         T0 = mapping.physical.T0_K
         mu_s = mapping.transport.sutherland_mu_K
@@ -330,13 +332,13 @@ def local_transport_coefficients(
     tau21 = 0.5 + nu / theta
     tau32 = 0.5 + alpha / theta
     if mapping.nu_b_lu == 0.0:
-        tau22 = np.full_like(theta, 0.5)
+        tau22 = xp.full_like(theta, 0.5)
     else:
         bulk = mapping.nu_b_lu * mu_ratio / rho_ratio
         D, S = mapping.lattice.D, mapping.lattice.S
         tau22 = 0.5 + bulk / (2.0 * S * theta / (D * (D + S)))
-    if not np.all(np.isfinite(tau21) & (tau21 > 0.5) & np.isfinite(tau32) & (tau32 > 0.5)
-                  & np.isfinite(tau22) & (tau22 >= 0.5)):
+    if not xp.all(xp.isfinite(tau21) & (tau21 > 0.5) & xp.isfinite(tau32) & (tau32 > 0.5)
+                  & xp.isfinite(tau22) & (tau22 >= 0.5)):
         raise ValueError("local transport produced non-finite or inadmissible relaxation times; no clipping applied")
     return LocalTransport(nu, alpha, tau21, tau22, tau32, 1.0 - 1.0 / tau32, 1.0 - 0.5 / tau32)
 

@@ -15,24 +15,30 @@ from __future__ import annotations
 
 import numpy as np
 
+from core.array_backend import array_module
 from core.equilibrium import equilibrium_fg
 from core.macroscopic import recover_macro
 
 
 def derivative(field, axis):
     """Fourth-order centred unit-grid derivative, second-order at edge pairs."""
-    v=np.moveaxis(np.asarray(field),axis,-1)
-    out=np.empty_like(v)
+    xp=array_module(field)
+    v=xp.moveaxis(xp.asarray(field),axis,-1)
+    out=xp.empty_like(v)
     out[...,2:-2]=(v[...,:-4]-8*v[...,1:-3]+8*v[...,3:-1]-v[...,4:])/12
     out[...,1]=(v[...,2]-v[...,0])/2
     out[...,-2]=(v[...,-1]-v[...,-3])/2
     out[...,0]=(-3*v[...,0]+4*v[...,1]-v[...,2])/2
     out[...,-1]=(3*v[...,-1]-4*v[...,-2]+v[...,-3])/2
-    return np.moveaxis(out,-1,axis)
+    return xp.moveaxis(out,-1,axis)
 
 
 class AcousticPML:
-    """Top and both side acoustic layers, with no bottom absorption."""
+    """Top and both side layers, with shared NumPy/Numba/CuPy source algebra.
+
+    The CuPy backend stores geometry, populations and convolution memories on
+    the device; only scalar validity checks synchronize during a half-step.
+    """
 
     def __init__(self,mapping,lattice,ny,nx,*,cells,target_return=.001,alpha_Hz=1000.,backend='numpy'):
         if type(cells) is not int or not 3<=cells<min(ny,nx//2):
@@ -42,6 +48,7 @@ class AcousticPML:
         if not np.isfinite(alpha_Hz) or alpha_Hz<0:
             raise ValueError('PML alpha_Hz must be finite and nonnegative')
         self.mapping,self.lattice=mapping,lattice
+        self.xp=np
         self.compiled_rhs=self.compiled_increment=None
         if backend=='numpy':
             self.recover,self.equilibrium=recover_macro,equilibrium_fg
@@ -51,8 +58,15 @@ class AcousticPML:
             from boundary.acoustic_pml_numba import acoustic_rhs
             self.recover,self.equilibrium=recover_macro_compiled,equilibrium_compiled
             self.compiled_rhs,self.compiled_increment=acoustic_rhs,apply_equilibrium_increment
+        elif backend=='cupy':
+            import cupy as cp
+            from core.collision_gpu import (recover_macro_gpu,equilibrium_gpu,
+                                            apply_equilibrium_increment)
+            self.xp=cp
+            self.recover,self.equilibrium=recover_macro_gpu,equilibrium_gpu
+            self.compiled_increment=apply_equilibrium_increment
         else:
-            raise ValueError('PML backend must be numpy or numba')
+            raise ValueError('PML backend must be numpy, numba or cupy')
         self.rho0=mapping.lattice.rho_ref_lu
         self.p0=self.rho0*mapping.theta_ref_lu
         self.c2=(1+2/(mapping.lattice.D+mapping.lattice.S))*mapping.theta_ref_lu
@@ -69,12 +83,15 @@ class AcousticPML:
         self.decay_y=self.sigma_y+alpha*(self.sigma_y>0)
         self.memory=np.zeros((4,ny,nx))
         self.kinetic=.5*np.sum(lattice.c*lattice.c,axis=1)
+        if backend=='cupy':
+            for name in ('sigma_x','sigma_y','active','decay_x','decay_y','memory','kinetic'):
+                setattr(self,name,self.xp.asarray(getattr(self,name)))
 
     def _rhs(self,v,rho,c2):
         if self.compiled_rhs is not None:
             return self.compiled_rhs(v,rho,c2,self.sigma_x,self.sigma_y,self.decay_x,self.decay_y)
         p,ux,uy,px,py,vx,vy=v
-        out=np.empty_like(v)
+        out=self.xp.empty_like(v)
         out[0]=-rho*c2*(vx+vy)
         out[1]=-px/rho
         out[2]=-py/rho
@@ -89,6 +106,7 @@ class AcousticPML:
         if duration_lu<=0 or not np.isfinite(duration_lu):
             raise ValueError('positive finite PML duration required')
         m=self.mapping
+        xp=self.xp
         state=self.recover(f,g,D=m.lattice.D,S=m.lattice.S,lattice=self.lattice)
         # Linearize the acoustic source at the current local thermodynamic
         # state, held during this half-step. A fixed 300 K impedance would be
@@ -96,7 +114,7 @@ class AcousticPML:
         # No fitted or time-filtered background is used. This remains a small-
         # amplitude acoustic source, not a nonlinear viscothermal PML proof.
         local_c2=state.gamma*state.theta
-        v=np.concatenate((np.stack((state.p-self.p0,state.u[...,0],state.u[...,1])),memory))
+        v=xp.concatenate((xp.stack((state.p-self.p0,state.u[...,0],state.u[...,1])),memory))
         h=duration_lu
         a=self._rhs(v,state.rho,local_c2); b=self._rhs(v+.5*h*a,state.rho,local_c2)
         c=self._rhs(v+.5*h*b,state.rho,local_c2); d=self._rhs(v+h*c,state.rho,local_c2)
@@ -104,7 +122,7 @@ class AcousticPML:
         active=self.active
         dp=new[0]-v[0]
         rho=state.rho+dp/local_c2
-        u=np.moveaxis(new[1:3],0,-1)
+        u=xp.moveaxis(new[1:3],0,-1)
         theta=(state.p+dp)/rho
         if self.compiled_increment is not None:
             fn,gn,change=self.compiled_increment(f,g,state.rho,state.u,state.theta,
@@ -118,6 +136,6 @@ class AcousticPML:
             # Sum actual population deltas, including roundoff in their write.
             actual_f,actual_g=fn[active]-f[active],gn[active]-g[active]
             change=np.array([np.sum(actual_f),np.sum(actual_f*self.kinetic+actual_g)])
-        if not np.isfinite(new).all():
+        if not xp.isfinite(new).all():
             raise FloatingPointError('nonfinite acoustic PML memory; state not committed')
         return fn,gn,new[3:].copy(),change

@@ -39,8 +39,8 @@ class CollisionDiagnostics:
 
 
 def validate_collision_backend(backend):
-    if backend not in ('numpy', 'numba'):
-        raise ValueError('collision_backend must be numpy or numba')
+    if backend not in ('numpy', 'numba', 'cupy'):
+        raise ValueError('collision_backend must be numpy, numba or cupy')
     return backend
 
 
@@ -385,6 +385,10 @@ def collide_fg(
 
     validate_collision_backend(backend)
     lattice = lattice or make_lattice()
+    if backend == 'cupy':
+        from core.collision_gpu import collide_gpu
+        return collide_gpu(f, g, mapping, lattice=lattice,
+                           return_diagnostics=return_diagnostics)
     f = np.asarray(f, dtype=float)
     g = np.asarray(g, dtype=float)
     if backend == 'numba':

@@ -26,6 +26,18 @@ from simulation.study import ROOT,valid_name
 
 def validate_propagation(source,result):
     """Compare actual k-Wave coordinates/phasors with independent Kirchhoff."""
+    backend_metadata = {}
+    if 'kwave_backend_requested' in source:
+        requested = str(source['kwave_backend_requested'])
+        if (requested not in ('cpu', 'matlab-gpu')
+                or str(result.get('kwave_backend_requested')) != requested
+                or str(result.get('kwave_backend_effective')) != requested):
+            raise ValueError('k-Wave backend differs from the explicit requested backend')
+        provenance = json.loads(str(result.get('gpu_provenance_json', '{}')))
+        if not isinstance(provenance, dict) or provenance.get('enabled') is not (requested == 'matlab-gpu'):
+            raise ValueError('k-Wave backend GPU provenance is missing or inconsistent')
+        backend_metadata = dict(kwave_backend_requested=requested,
+            kwave_backend_effective=requested, gpu_provenance=provenance)
     diagnostic=bool(source.get('diagnostic_mode',0)==1)
     source_passed=bool(source['source_validation_passed']==1)
     if diagnostic and (result.get('diagnostic_mode')!=1
@@ -94,6 +106,7 @@ def validate_propagation(source,result):
         timeseries_matches_reported_phase=signal_phase<=1.,timeseries_interior_cancellation=signal_leak<=.01)
     far=np.flatnonzero(roles=='farfield_45mm')
     return dict(status='completed',source_validation_passed=checks['source_validation'],
+        **backend_metadata,
         diagnostic_mode=diagnostic,source_validation_bypassed=bool(diagnostic and not source_passed),
         propagation_validation_passed=all(checks.values()),checks=checks,
         max_amplitude_error_relative=amp,max_phase_error_deg=phase,interior_leakage_relative=leakage,
@@ -117,6 +130,8 @@ def main(argv=None):
     parser.add_argument('--stage',choices=('all','propagate'),default='all')
     parser.add_argument('--matlab',type=Path,default=Path('E:/Matlab/bin/matlab.exe'))
     parser.add_argument('--toolbox',type=Path,default=ROOT/'k-wave-toolbox-version-1.4.1')
+    parser.add_argument('--kwave-backend',choices=('cpu','matlab-gpu'),default='cpu',
+        help='Use CPU double precision or MATLAB gpuArray double precision; no fallback.')
     parser.add_argument('--diagnostic',action='store_true',
         help='Propagate a saved stable source despite its direct-pressure comparison failure; retain failed validation.')
     parser.add_argument('--matlab-threads',type=int,
@@ -163,7 +178,9 @@ def main(argv=None):
             raise FileExistsError(path)
     quote=lambda path:"'"+Path(path).resolve().as_posix().replace("'","''")+"'"
     thread_setting='' if args.matlab_threads is None else f'maxNumCompThreads({args.matlab_threads});'
-    probe=thread_setting+f"addpath({quote(args.toolbox)});assert(~isempty(which('kspaceFirstOrder2D')));disp('MATLAB/k-Wave preflight passed')"
+    gpu_probe=("assert(license('test','Distrib_Computing_Toolbox'),'MATLAB Parallel Computing Toolbox is required');"
+               "gpuDevice;" if args.kwave_backend=='matlab-gpu' else '')
+    probe=thread_setting+gpu_probe+f"addpath({quote(args.toolbox)});assert(~isempty(which('kspaceFirstOrder2D')));disp('MATLAB/k-Wave preflight passed')"
     if args.stage=='all':
         subprocess.run([str(args.matlab),'-batch',probe],cwd=ROOT,check=True)
         print(json.dumps(dict(stage='power',output=str(case),exists=case.exists(),
@@ -173,13 +190,15 @@ def main(argv=None):
     if args.diagnostic:
         # Re-read the immutable saved run. Existing failed analysis remains intact.
         analysis,arrays=analyze_saved(case)
-        export_kwave_input(incoming,analysis,arrays,toolbox_path=args.toolbox,diagnostic=True)
+        export_kwave_input(incoming,analysis,arrays,toolbox_path=args.toolbox,diagnostic=True,
+                           kwave_backend=args.kwave_backend)
         print(json.dumps(dict(stage='diagnostic_propagation',
             source_validation_passed=analysis['source_validation_passed'],
             failed_source_checks=[key for key,ok in analysis['checks'].items() if not ok],
             input=str(incoming),output=str(outgoing)),indent=2),flush=True)
     else:
-        status=analyze_main(['--batch',str(root),'--case','power_r2','--export-kwave','--toolbox',str(args.toolbox)])
+        status=analyze_main(['--batch',str(root),'--case','power_r2','--export-kwave','--toolbox',str(args.toolbox),
+                             '--kwave-backend',args.kwave_backend])
         if status:
             print('Nearfield/source gate failed; diagnostics saved and propagation not started.',flush=True)
             return status

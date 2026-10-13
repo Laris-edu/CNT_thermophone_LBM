@@ -10,6 +10,37 @@ SOURCE_DIRS=('core','boundary','coupling','phase3_interfaces','farfield','postpr
              'reference','simulation','scripts','configs')
 
 
+def capture_numpy_runtime(cell_count):
+    """Record the array runtime without claiming a compiled CPU dispatch."""
+    import numpy as np
+
+    return dict(cell_count=int(cell_count), precision='float64',
+        platform=platform.platform(), machine=platform.machine(),
+        versions=dict(python=platform.python_version(), numpy=np.__version__))
+
+
+def capture_cupy_runtime(cell_count):
+    """Record the current CUDA device and available memory at this instant."""
+    import cupy as cp
+
+    device_id=int(cp.cuda.Device().id)
+    properties=cp.cuda.runtime.getDeviceProperties(device_id)
+    name=properties['name']
+    if isinstance(name,bytes):
+        name=name.decode('utf-8',errors='replace')
+    free,total=cp.cuda.runtime.memGetInfo()
+    runtime=capture_numpy_runtime(cell_count)
+    runtime.update(device_id=device_id,device_name=name,
+        cuda_runtime_version=int(cp.cuda.runtime.runtimeGetVersion()),
+        cuda_driver_version=int(cp.cuda.runtime.driverGetVersion()),
+        free_memory_bytes=int(free),total_memory_bytes=int(total),
+        environment={key:os.environ.get(key) for key in (
+            'CUDA_VISIBLE_DEVICES','CUDA_DEVICE_ORDER','CUPY_ACCELERATORS',
+            'CUPY_GPU_MEMORY_LIMIT')})
+    runtime['versions']['cupy']=cp.__version__
+    return runtime
+
+
 def capture_numba_runtime(cell_count):
     """Record effective dispatch; environment settings are not source hashes."""
     import llvmlite
@@ -41,7 +72,8 @@ def source_files(root):
     root=Path(root)
     return sorted({p for directory in SOURCE_DIRS for p in (root/directory).rglob('*')
         if p.is_file() and p.suffix in ('.py','.yaml')} |
-        {root/name for name in ('config_io.py','requirements.txt','requirements-lock.txt','pyproject.toml')
+        {root/name for name in ('config_io.py','requirements.txt','requirements-lock.txt',
+                               'requirements-gpu.txt','pyproject.toml')
          if (root/name).is_file()})
 
 
@@ -68,7 +100,8 @@ def capture_source(root, cache=None):
             tracked=set(git('ls-files','-z').split('\0'))
             # Include deleted runtime files: they no longer appear in the current file list.
             clean=set(hashes).issubset(tracked) and not git('diff','--name-only','HEAD','--',
-                *SOURCE_DIRS,'config_io.py','requirements.txt','requirements-lock.txt','pyproject.toml')
+                *SOURCE_DIRS,'config_io.py','requirements.txt','requirements-lock.txt',
+                'requirements-gpu.txt','pyproject.toml')
     except (OSError,subprocess.CalledProcessError):
         pass
     return dict(source_id=source_id,git_commit=commit,git_dirty=dirty,

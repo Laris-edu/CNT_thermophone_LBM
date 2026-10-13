@@ -43,6 +43,9 @@ def validate_boundary_evidence(root,config,*,source_id=None,proof_path=None):
                 or not item['git_commit']):
             raise ValueError('boundary evidence does not match the committed public runtime')
     candidate=yaml.safe_load((root/'raw'/provenance['combined']['name']/'effective.yaml').read_text())
+    if (candidate.get('numerics',{}).get('collision_backend','numba')
+            != config.get('numerics',{}).get('collision_backend','numba')):
+        raise ValueError('boundary collision_backend differs from power run')
     for key in ('width_m','height_m','pml_width_m','pml_target_return','pml_alpha_Hz','sponge_rate'):
         if candidate['strip'][key]!=config['strip'][key]:
             raise ValueError(f'boundary geometry/absorber differs from power run: {key}')

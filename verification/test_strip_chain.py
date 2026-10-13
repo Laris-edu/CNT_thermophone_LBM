@@ -196,6 +196,8 @@ def test_diagnostic_propagation_preserves_failed_source_and_existing_analysis(tm
             observer_y_m=incoming['expected_grid_observer_y_m'],
             observer_p_hat_Pa=hat, time_s=times,
             observer_pressure_Pa=np.real(hat[:, None]*np.exp(2j*np.pi*20000*times)),
+            kwave_backend_requested='cpu', kwave_backend_effective='cpu',
+            gpu_provenance_json='{"enabled":false}',
             diagnostic_mode=1, source_validation_passed=0, source_validation_bypassed=1))
     monkeypatch.setattr(chain.subprocess, 'run', matlab)
     assert chain.main(args+['--diagnostic', '--matlab-threads', '4']) == 0

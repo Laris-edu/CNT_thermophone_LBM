@@ -1,0 +1,3 @@
+-r requirements-lock.txt
+cupy-cuda12x==14.2.0
+cuda-pathfinder==1.8.3

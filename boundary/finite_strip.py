@@ -14,15 +14,17 @@ import numpy as np
 
 from core.equilibrium import equilibrium_fg
 from core.macroscopic import recover_macro
+from core.array_backend import array_module
 
 
 def pull_stream_open_xy(distribution, *, lattice):
     """Stream only in-domain links; every missing incoming link remains NaN."""
-    dist = np.asarray(distribution, dtype=float)
+    xp = array_module(distribution)
+    dist = xp.asarray(distribution, dtype=float)
     if dist.ndim != 3 or dist.shape[-1] != lattice.q:
         raise ValueError('open xy streaming requires (ny,nx,Q)')
     ny, nx = dist.shape[:2]
-    out = np.full_like(dist, np.nan)
+    out = xp.full_like(dist, xp.nan)
     for a, (cx, cy) in enumerate(lattice.c.astype(int)):
         x0, x1 = max(0, cx), min(nx, nx+cx)
         y0, y1 = max(0, cy), min(ny, ny+cy)
@@ -99,6 +101,16 @@ class FiniteStripLinks:
                 self.wall_out, self.wall_bin_out = _select(indices, film), bins
                 self.outer_out = _select(indices, outer)
         self._prepare_outer_faces(c)
+        self._c = lattice.c
+
+    def to_device(self):
+        """Upload the already constructed topology once; geometry stays shared."""
+        import cupy as cp
+        for name, value in tuple(vars(self).items()):
+            if isinstance(value, np.ndarray):
+                setattr(self, name, cp.asarray(value))
+            elif isinstance(value, tuple) and all(isinstance(v, np.ndarray) for v in value):
+                setattr(self, name, tuple(cp.asarray(v) for v in value))
 
     def _prepare_outer_faces(self, c):
         y, x, a = self.outer_in
@@ -140,12 +152,13 @@ class FiniteStripLinks:
         indices = (self.wall_in if incoming else self.wall_out) if wall else (
             self.outer_in if incoming else self.outer_out)
         fl, gl = f[indices], g[indices]
-        kinetic = .5*np.sum(self.lattice.c[indices[2]]**2, axis=1)
+        xp = array_module(f)
+        kinetic = .5*xp.sum(self._c[indices[2]]**2, axis=1)
         if wall:
             bins = self.wall_bin_in if incoming else self.wall_bin_out
-            return np.array([np.bincount(bins, weights=fl, minlength=self.nfilm),
-                np.bincount(bins, weights=kinetic*fl+gl, minlength=self.nfilm)])
-        return np.array([np.sum(fl), np.sum(kinetic*fl+gl)])
+            return xp.stack([xp.bincount(bins, weights=fl, minlength=self.nfilm),
+                xp.bincount(bins, weights=kinetic*fl+gl, minlength=self.nfilm)])
+        return xp.stack([xp.sum(fl), xp.sum(kinetic*fl+gl)])
 
 
 class PreparedStripWall:
@@ -158,23 +171,29 @@ class PreparedStripWall:
     def __init__(self, f_post, g_post, mapping, lattice, links):
         self.mapping, self.lattice, self.links = mapping, lattice, links
         self.outgoing = links.totals(f_post, g_post, wall=True, incoming=False)
+        self.xp = array_module(f_post)
+        self.equilibrium = equilibrium_fg
+        if self.xp is not np:
+            from core.collision_gpu import equilibrium_gpu
+            self.equilibrium = equilibrium_gpu
         self._temperature = None
 
     def _incoming(self, temperature_K):
-        temperature = np.broadcast_to(np.asarray(temperature_K, dtype=float), (self.links.nfilm,))
-        if not np.isfinite(temperature).all() or np.any(temperature <= 0):
+        xp = self.xp
+        temperature = xp.broadcast_to(xp.asarray(temperature_K, dtype=float), (self.links.nfilm,))
+        if not xp.isfinite(temperature).all() or xp.any(temperature <= 0):
             raise ValueError('wall temperatures must be finite and positive')
-        if self._temperature is None or not np.array_equal(temperature, self._temperature):
+        if self._temperature is None or not xp.array_equal(temperature, self._temperature):
             count = self.links.nfilm
             if count == 0:
-                self._f = self._g = np.empty(0)
+                self._f = self._g = xp.empty(0)
             else:
-                fw, gw = equilibrium_fg(np.ones(count), np.zeros((count, 2)),
+                fw, gw = self.equilibrium(xp.ones(count), xp.zeros((count, 2)),
                     temperature/self.mapping.temperature_scale, self.mapping.lattice.S, self.lattice)
                 bins, directions = self.links.wall_bin_in, self.links.wall_in[2]
                 fl, gl = fw[bins, directions], gw[bins, directions]
-                denominator = np.bincount(bins, weights=fl, minlength=count)
-                if np.any(denominator <= 0):
+                denominator = xp.bincount(bins, weights=fl, minlength=count)
+                if xp.any(denominator <= 0):
                     raise FloatingPointError('film bin has no positive incoming mass')
                 rho_wall = self.outgoing[0]/denominator
                 self._f, self._g = fl*rho_wall[bins], gl*rho_wall[bins]
@@ -183,8 +202,8 @@ class PreparedStripWall:
 
     def energy_exchange_lu(self, temperature_K):
         fl, gl = self._incoming(temperature_K)
-        kinetic = .5*np.sum(self.lattice.c[self.links.wall_in[2]]**2, axis=1)
-        return np.bincount(self.links.wall_bin_in, weights=kinetic*fl+gl,
+        kinetic = .5*self.xp.sum(self.links._c[self.links.wall_in[2]]**2, axis=1)
+        return self.xp.bincount(self.links.wall_bin_in, weights=kinetic*fl+gl,
                            minlength=self.links.nfilm)-self.outgoing[1]
 
     def write(self, temperature_K, f_new, g_new):
@@ -194,13 +213,18 @@ class PreparedStripWall:
 def characteristic_outer(f_post, g_post, f_new, g_new, mapping, lattice, links):
     """Experimental local-normal W_in=0 on left/right/top; no oblique guarantee."""
     rho0, theta0, c0 = mapping.lattice.rho_ref_lu, mapping.theta_ref_lu, mapping.c0_lu
+    xp = array_module(f_post)
+    recover, equilibrium = recover_macro, equilibrium_fg
+    if xp is not np:
+        from core.collision_gpu import recover_macro_gpu, equilibrium_gpu
+        recover, equilibrium = recover_macro_gpu, equilibrium_gpu
     for face, (axis, sign) in enumerate(((0, -1), (0, 1), (1, 1))):
         mask = links.outer_face == face
-        if not np.any(mask):
+        if not xp.any(mask):
             continue
         f, g = ((f_post[:, 0], g_post[:, 0]) if face == 0 else
                 ((f_post[:, -1], g_post[:, -1]) if face == 1 else (f_post[-1], g_post[-1])))
-        state = recover_macro(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
+        state = recover(f, g, D=mapping.lattice.D, S=mapping.lattice.S, lattice=lattice)
         dp = state.p-rho0*theta0
         outgoing = dp+rho0*c0*sign*state.u[..., axis]
         entropy = state.rho-rho0-dp/c0**2
@@ -208,8 +232,8 @@ def characteristic_outer(f_post, g_post, f_new, g_new, mapping, lattice, links):
         p_target = rho0*theta0+.5*outgoing
         u_target = state.u.copy()
         u_target[..., axis] = sign*.5*outgoing/(rho0*c0)
-        fe, ge = equilibrium_fg(state.rho, state.u, state.theta, mapping.lattice.S, lattice)
-        ft, gt = equilibrium_fg(rho_target, u_target, p_target/rho_target, mapping.lattice.S, lattice)
+        fe, ge = equilibrium(state.rho, state.u, state.theta, mapping.lattice.S, lattice)
+        ft, gt = equilibrium(rho_target, u_target, p_target/rho_target, mapping.lattice.S, lattice)
         ft, gt = ft+f-fe, gt+g-ge
         indices = _select(links.outer_in, mask)
         sample = links.outer_tangent[mask]

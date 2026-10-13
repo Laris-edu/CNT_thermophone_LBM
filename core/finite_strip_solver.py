@@ -14,6 +14,7 @@ from boundary.finite_strip import (FiniteStripLinks, PreparedStripWall,
 from core.collision_smrt import collide_fg
 from core.equilibrium import equilibrium_fg
 from core.solver import GasSolver2D
+from core.array_backend import to_numpy
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class FiniteStripSolver(GasSolver2D):
     reflection_validation = 'not_run'
     boundary_model = 'experimental_local_normal_characteristic_with_reference_sponge'
     exchange_is_local = True
+    supports_gpu = True
 
     def __init__(self, config, *, film_width_m=1e-3, x_min_m=None,
                  film_center_m=0., sponge_cells=0, sponge_rate=0.,
@@ -99,12 +101,37 @@ class FiniteStripSolver(GasSolver2D):
                 backend=self.collision_backend)
             self.boundary_model = 'experimental_acoustic_cfs_pml_with_outer_characteristic'
         self.last_audit = None
+        self.xp = np
+        if self.collision_backend == 'cupy':
+            import cupy as cp
+            self.xp = cp
+            self.boundary.to_device()
+            self._sponge = cp.asarray(self._sponge)
+            self._reference_f = cp.asarray(self._reference_f)
+            self._reference_g = cp.asarray(self._reference_g)
+            self._kinetic = cp.asarray(self._kinetic)
 
     def initialize_from_macro(self, rho, u, theta):
-        super().initialize_from_macro(rho,u,theta)
+        if self.collision_backend == 'cupy':
+            from core.collision_gpu import equilibrium_gpu
+            xp = self.xp
+            rho = xp.broadcast_to(xp.asarray(rho, dtype=float), (self.ny, self.nx))
+            theta = xp.broadcast_to(xp.asarray(theta, dtype=float), (self.ny, self.nx))
+            u = xp.broadcast_to(xp.asarray(u, dtype=float), (self.ny, self.nx, 2))
+            self.f, self.g = equilibrium_gpu(rho, u, theta, self.mapping.lattice.S, self.lattice)
+            self.t_lu = 0
+        else:
+            super().initialize_from_macro(rho,u,theta)
         if self.pml is not None:
             self.pml.memory.fill(0.)
         self.last_audit = None
+
+    def get_macro(self):
+        if self.collision_backend == 'cupy':
+            from core.collision_gpu import recover_macro_gpu
+            return recover_macro_gpu(*self._require_state(), D=self.mapping.lattice.D,
+                                     S=self.mapping.lattice.S, lattice=self.lattice)
+        return super().get_macro()
 
     @property
     def x_m(self):
@@ -115,11 +142,14 @@ class FiniteStripSolver(GasSolver2D):
         return (np.arange(self.ny)+.5)*self.mapping.lattice.dx_m
 
     def _totals(self, f, g):
-        if self.collision_backend == 'numba':
+        if self.collision_backend in ('numba', 'cupy'):
             return np.asarray(self._population_statistics(f, g)[:2])
         return np.array([np.sum(f), np.sum(f*self._kinetic+g)])
 
     def _population_statistics(self, f, g):
+        if self.collision_backend == 'cupy':
+            from core.finite_strip_gpu import population_statistics
+            return population_statistics(f, g, self._kinetic)
         if self.collision_backend == 'numba':
             from core.finite_strip_numba import population_statistics
             return population_statistics(f, g, self._kinetic)
@@ -128,7 +158,7 @@ class FiniteStripSolver(GasSolver2D):
                 bool(np.isfinite(f).all() and np.isfinite(g).all()))
 
     def population_extrema(self):
-        return tuple(float(np.min(v)) for v in self._require_state())
+        return tuple(float(self.xp.min(v)) for v in self._require_state())
 
     def warmup_collision(self):
         f, g = self._require_state()
@@ -153,9 +183,13 @@ class FiniteStripSolver(GasSolver2D):
         pml_change = np.zeros(2)
         if self.pml is not None:
             f,g,pml_memory,pml_change = self.pml.advance(f,g,self.pml.memory,.5)
+            pml_change = to_numpy(pml_change)
             self._check_populations(f,g)
         fp, gp = collide_fg(f, g, self.mapping, lattice=self.lattice, backend=self.collision_backend)
-        if self.collision_backend == 'numba':
+        if self.collision_backend == 'cupy':
+            from core.finite_strip_gpu import stream_open_xy_pair
+            fn, gn = stream_open_xy_pair(fp, gp, self.lattice.c)
+        elif self.collision_backend == 'numba':
             from core.finite_strip_numba import stream_open_xy_pair
             fn, gn = stream_open_xy_pair(fp, gp, self.lattice.c)
         else:
@@ -167,7 +201,7 @@ class FiniteStripSolver(GasSolver2D):
         length_scale = area_scale*dx
 
         def exchange(temperature_K):
-            return wall.energy_exchange_lu(temperature_K)*area_scale
+            return to_numpy(wall.energy_exchange_lu(temperature_K))*area_scale
 
         temperature_K = solve_temperature(exchange)
         wall.write(temperature_K, fn, gn)
@@ -179,6 +213,7 @@ class FiniteStripSolver(GasSolver2D):
                        -self.boundary.totals(fp, gp, wall=True, incoming=False))
         outer_change = (self.boundary.totals(fn, gn, wall=False, incoming=True)
                         -self.boundary.totals(fp, gp, wall=False, incoming=False))
+        wall_change, outer_change = to_numpy(wall_change), to_numpy(outer_change)
         sponge_change = np.zeros(2)
         if self.sponge_rate:
             pre_sponge = np.asarray(after_statistics[:2])
@@ -189,7 +224,7 @@ class FiniteStripSolver(GasSolver2D):
             sponge_change = np.asarray(after_statistics[:2])-pre_sponge
         if self.pml is not None:
             fn,gn,pml_memory,change = self.pml.advance(fn,gn,pml_memory,.5)
-            pml_change += change
+            pml_change += to_numpy(change)
             after_statistics = self._check_populations(fn,gn)
         after = np.asarray(after_statistics[:2])
         residual = after-before-wall_change.sum(axis=1)-outer_change-sponge_change-pml_change

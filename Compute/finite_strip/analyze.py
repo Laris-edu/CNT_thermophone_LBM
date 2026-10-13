@@ -350,8 +350,10 @@ def analyze_saved(case_dir, boundary_path=None):
     return result, arrays
 
 
-def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False):
+def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False, kwave_backend='cpu'):
     """Export Gamma 2; explicit diagnostics may bypass only its direct check."""
+    if kwave_backend not in ('cpu', 'matlab-gpu'):
+        raise ValueError('k-Wave backend must be cpu or matlab-gpu')
     checks = result.get('checks', {})
     if diagnostic:
         required = {'run_completed', 'state_validation', 'boundary_prerequisite',
@@ -378,7 +380,7 @@ def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False):
                                  arrays['surface_ux_hat_m_s'][a:b], arrays['surface_uy_hat_m_s'][a:b])
     indices = np.asarray(arrays['validation_probe_indices'], dtype=int)
     px, py = arrays['probe_x_m'][indices], arrays['probe_y_m'][indices]
-    dx, half_x, half_y = .00005, .004, .049
+    dx, half_y = .00005, .049
     # Direct LBM probes may lie closer to Gamma than the propagation grid can
     # resolve. Keep their measured data below; move only propagation checks
     # along the outward vector from the nearest point on the Gamma 2 rectangle.
@@ -391,6 +393,11 @@ def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False):
     outward_scale = np.maximum(1., 3*dx/clearance)
     exterior_x, exterior_y = anchor_x+outward_scale*outward_x, anchor_y+outward_scale*outward_y
     ox, oy = np.r_[exterior_x, 0., 0., -.0004, .0004], np.r_[exterior_y, .045, 0., 0., 0.]
+    # Keep the historical 4 mm minimum and 3.1 mm source-to-domain margin.
+    # Wider films need a wider acoustic grid; retain a cell after snapping
+    # even when an exterior validation receiver extends beyond that margin.
+    requested_half_x = max(.004, width+.0031, float(np.max(abs(ox)))+2*dx)
+    half_x = float(np.ceil(requested_half_x/dx-1e-12)*dx)
     # Match MATLAB round for nonnegative grid indices, not Python's ties-to-even.
     sx = -half_x+np.floor((ox+half_x)/dx+.5)*dx
     sy = -half_y+np.floor((oy+half_y)/dx+.5)*dx
@@ -406,6 +413,7 @@ def export_kwave_input(path, result, arrays, *, toolbox_path, diagnostic=False):
         dx_m=dx, domain_half_width_m=half_x, domain_half_height_m=half_y,
         pml_size=32, evaluation_cycles=8.25, ramp_cycles=3., record_cycles=2., cfl=.3,
         toolbox_path=str(Path(toolbox_path).resolve()),
+        kwave_backend_requested=kwave_backend,
         source_validation_passed=int(result['source_validation_passed']),
         diagnostic_mode=int(diagnostic), source_validation_bypassed=int(diagnostic),
         diagnostic_scope=('Diagnostic export bypasses kirchhoff_vs_direct only; source remains not validated. '
@@ -437,6 +445,7 @@ def main(argv=None):
     parser.add_argument('--boundary', type=Path)
     parser.add_argument('--export-kwave', action='store_true')
     parser.add_argument('--toolbox', type=Path, default=ROOT/'k-wave-toolbox-version-1.4.1')
+    parser.add_argument('--kwave-backend', choices=('cpu', 'matlab-gpu'), default='cpu')
     args = parser.parse_args(argv)
     name = valid_name(args.case)
     destination = args.batch.resolve()/'final'
@@ -449,7 +458,7 @@ def main(argv=None):
     result['kwave_export'] = dict(requested=args.export_kwave, created=False, path=None)
     destination.mkdir(parents=True, exist_ok=True)
     if args.export_kwave and result['source_validation_passed']:
-        export_kwave_input(mat, result, arrays, toolbox_path=args.toolbox)
+        export_kwave_input(mat, result, arrays, toolbox_path=args.toolbox, kwave_backend=args.kwave_backend)
         result['kwave_export'].update(created=True, path=str(mat))
     elif args.export_kwave:
         result['kwave_export']['reason'] = 'source validation failed; no MAT file created'

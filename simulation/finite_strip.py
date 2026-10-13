@@ -14,6 +14,7 @@ import numpy as np
 import yaml
 
 from config_io import load_config
+from core.array_backend import array_module, to_numpy
 from core.unit_mapping import create_unit_mapping
 from simulation.output import dump
 from simulation.provenance import capture_source
@@ -26,6 +27,7 @@ DEFAULTS=dict(kind='power',dx_m=1.305875e-6,width_m=.002,height_m=.0005,
     G_W_m2K=0.,initial_temperature_K=300.,sponge_width_m=.0001,sponge_rate=.05,
     pulse_amplitude_Pa=1.,pulse_sigma_m=75e-6,probe_radius_m=.00025,
     sample_every=1,field_samples_per_cycle=32,stop_when_stable=True,
+    collision_backend='numba',
     pml_width_m=0.,pml_target_return=.001,pml_alpha_Hz=1000.,
     handoff_contours_m=[[.00065,.00015],[.0007,.0002],[.00075,.00025]],
     validation_probes_m=[[0.,.00028],[-.00078,.0001],[.00078,.0001]])
@@ -93,6 +95,8 @@ def prepare_strip_case(parameters, base=None):
     name=valid_name(p.get('name','finite_strip'))
     if p['kind'] not in ('power','pulse'):
         raise ValueError('strip kind must be power or pulse')
+    if p['collision_backend'] not in ('numpy','numba','cupy'):
+        raise ValueError('collision_backend must be numpy, numba or cupy')
     if p['kind']=='pulse' and 'film_width_m' not in parameters:
         p['film_width_m']=0.
     if p['kind']=='pulse' and p['film_width_m']!=0:
@@ -121,7 +125,7 @@ def prepare_strip_case(parameters, base=None):
     nx=int(round(p['width_m']/p['dx_m'])); ny=int(round(p['height_m']/p['dx_m']))
     if min(nx,ny)<8:
         raise ValueError('finite strip requires at least eight cells per axis')
-    c['numerics'].update(nx=nx,ny=ny,collision_backend='numba',boundary='finite_strip_open_xy')
+    c['numerics'].update(nx=nx,ny=ny,collision_backend=p['collision_backend'],boundary='finite_strip_open_xy')
     c['case']={'name':name,'purpose':'finite-width infinite strip, symmetric two-sided heating'}
     m=create_unit_mapping(c)
     duration=p['cycles']/p['frequency_Hz'] if p['kind']=='power' else p['duration_s']
@@ -142,13 +146,29 @@ def prepare_strip_case(parameters, base=None):
 
 def _totals(solver):
     f,g=solver._require_state()
-    c2=np.sum(solver.lattice.c**2,axis=1)
-    return float(np.sum(f)),float(np.sum(.5*f*c2+g)*solver.mapping.pressure_scale*solver.mapping.lattice.dx_m**2)
+    mass,energy,*_=solver._population_statistics(f,g)
+    return mass,energy*solver.mapping.pressure_scale*solver.mapping.lattice.dx_m**2
 
 
 def _sample_bilinear(values,x,y,px,py):
-    from scipy.interpolate import RegularGridInterpolator
-    return RegularGridInterpolator((y,x),values,bounds_error=True)(np.column_stack((py,px)))
+    xp=array_module(values)
+    if xp is np:
+        from scipy.interpolate import RegularGridInterpolator
+        return RegularGridInterpolator((y,x),values,bounds_error=True)(np.column_stack((py,px)))
+    # Geometry is small and remains on the host. Gather only the four values
+    # per observation on-device; never download a full field to interpolate.
+    x,y,px,py=(np.asarray(v) for v in (x,y,px,py))
+    if (not np.isfinite(px).all() or not np.isfinite(py).all()
+            or np.any(px<x[0]) or np.any(px>x[-1])
+            or np.any(py<y[0]) or np.any(py>y[-1])):
+        raise ValueError('sampling points must lie on the cell-centre grid')
+    ix=np.clip(np.searchsorted(x,px,side='right')-1,0,len(x)-2)
+    iy=np.clip(np.searchsorted(y,py,side='right')-1,0,len(y)-2)
+    wx=xp.asarray((px-x[ix])/(x[ix+1]-x[ix]))
+    wy=xp.asarray((py-y[iy])/(y[iy+1]-y[iy]))
+    ix,iy=xp.asarray(ix),xp.asarray(iy)
+    return to_numpy((1-wy)*((1-wx)*values[iy,ix]+wx*values[iy,ix+1])
+                    +wy*((1-wx)*values[iy+1,ix]+wx*values[iy+1,ix+1]))
 
 
 def _pulse_initialize(solver,run):
@@ -314,9 +334,9 @@ def collect_strip(solver,run):
         audit_columns=np.asarray(audit_columns),initial_gas_mass_lu=initial_mass,
         initial_gas_energy_J_m=initial_energy,initial_film_temperature_K=film_initial,
         film_x_m=solver.film_x_m,film_dx_m=solver.film_dx_m,x_m=solver.x_m,y_m=solver.y_m,
-        final_pressure_perturbation_Pa=macro.p*m.pressure_scale-pressure0,
-        final_temperature_K=macro.theta*m.temperature_scale,
-        final_velocity_m_s=macro.u*m.velocity_scale,
+        final_pressure_perturbation_Pa=to_numpy(macro.p*m.pressure_scale-pressure0),
+        final_temperature_K=to_numpy(macro.theta*m.temperature_scale),
+        final_velocity_m_s=to_numpy(macro.u*m.velocity_scale),
         minimum_f=minimum_f,minimum_g=minimum_g,max_film_energy_residual_J_m=max_film_residual,
         max_wall_mass_lu=max_wall_mass,periodic_response_stable=bool(stationary_history and stationary_history[-1]['passed']),
         elapsed_s=time.perf_counter()-start,stop_reason=stop_reason,run_completed=True)
@@ -374,7 +394,8 @@ def summarize_strip(data,config):
 def run_strip_case(effective,output):
     """Run only a new directory and retain failed-run status under four-file contract."""
     from core.finite_strip_solver import FiniteStripSolver
-    from simulation.provenance import capture_numba_runtime
+    from simulation.provenance import (capture_cupy_runtime,capture_numba_runtime,
+                                       capture_numpy_runtime)
     c=deepcopy(effective); run=c['strip']; output=Path(output).resolve()
     if output.exists():
         raise FileExistsError(f'case already exists: {output}')
@@ -385,10 +406,12 @@ def run_strip_case(effective,output):
         pml_alpha_Hz=run.get('pml_alpha_Hz',1000.))
     run.update(actual_film_x_min_m=float(solver.film_x_min_m),
                actual_film_x_max_m=float(solver.film_x_max_m))
-    runtime=capture_numba_runtime(solver.nx*solver.ny)
+    capture_runtime={'numpy':capture_numpy_runtime,'numba':capture_numba_runtime,
+                     'cupy':capture_cupy_runtime}[solver.collision_backend]
+    runtime=capture_runtime(solver.nx*solver.ny)
     manifest=dict(status='running',created_utc=datetime.now(timezone.utc).isoformat(),
         finished_utc=None,**source,geometry='2D infinite strip, upper symmetric half-space',
-        collision_backend='numba',phase_convention='exp(+i omega t)',
+        collision_backend=solver.collision_backend,phase_convention='exp(+i omega t)',
         pressure='direct gas pressure',film_edge='adiabatic, no electrodes/support solids',
         exit=solver.boundary_model,runtime=runtime,runtime_started=deepcopy(runtime),
         boundary_validation_passed=None)
@@ -411,18 +434,34 @@ def run_strip_case(effective,output):
         manifest['error']=error
         # Preserve the last accepted state even if a later trial fails. Never
         # relabel it a completed trajectory or fabricate an accepted step.
-        if solver.f is not None:
-            state=solver.get_macro()
-            np.savez_compressed(output/'trajectory.npz',t_s=np.array([solver.t_lu*solver.mapping.lattice.dt_s]),
-                run_completed=False,accepted_steps=solver.t_lu,x_m=solver.x_m,y_m=solver.y_m,
-                last_pressure_Pa=state.p*solver.mapping.pressure_scale,
-                last_temperature_K=state.theta*solver.mapping.temperature_scale,
-                last_velocity_m_s=state.u*solver.mapping.velocity_scale)
-        dump(output/'summary.json',dict(status=manifest['status'],validation_passed=None,error=error))
+        # Device recovery is best effort after OOM/context loss. Convert all
+        # fields before opening the archive so failed downloads retain the
+        # incomplete placeholder, and never replace the original exception.
+        try:
+            if solver.f is not None:
+                state=solver.get_macro()
+                np.savez_compressed(output/'trajectory.npz',t_s=np.array([solver.t_lu*solver.mapping.lattice.dt_s]),
+                    run_completed=False,accepted_steps=solver.t_lu,x_m=solver.x_m,y_m=solver.y_m,
+                    last_pressure_Pa=to_numpy(state.p*solver.mapping.pressure_scale),
+                    last_temperature_K=to_numpy(state.theta*solver.mapping.temperature_scale),
+                    last_velocity_m_s=to_numpy(state.u*solver.mapping.velocity_scale))
+        except Exception as recovery_error:
+            manifest.setdefault('secondary_errors',[]).append(dict(stage='state_recovery',
+                type=type(recovery_error).__name__,message=str(recovery_error)))
         raise
     finally:
         manifest.update(finished_utc=datetime.now(timezone.utc).isoformat(),elapsed_s=time.perf_counter()-started)
-        manifest['runtime']=capture_numba_runtime(solver.nx*solver.ny)
+        try:
+            manifest['runtime']=capture_runtime(solver.nx*solver.ny)
+        except Exception as runtime_error:
+            # Keep the initial runtime when the device can no longer answer.
+            manifest.setdefault('secondary_errors',[]).append(dict(stage='runtime_capture',
+                type=type(runtime_error).__name__,message=str(runtime_error)))
+        if 'error' in manifest:
+            failed=dict(status=manifest['status'],validation_passed=None,error=manifest['error'])
+            if 'secondary_errors' in manifest:
+                failed['secondary_errors']=manifest['secondary_errors']
+            dump(output/'summary.json',failed)
         dump(output/'manifest.json',manifest)
 
 
@@ -442,6 +481,9 @@ def compare_pulse_cases(trial,reference,*,return_start_s,limit=.01,trial_effecti
     ratios=np.max(abs(actual[mask]-ref[mask]),axis=0)/scale
     reference_checked=False; reference_return_s=None
     if trial_effective is not None and reference_effective is not None:
+        if (trial_effective.get('numerics',{}).get('collision_backend','numba')
+                != reference_effective.get('numerics',{}).get('collision_backend','numba')):
+            raise ValueError('boundary reference differs in collision_backend')
         for key in ('physical','lattice','transport','collision'):
             if trial_effective[key]!=reference_effective[key]:
                 raise ValueError(f'boundary reference differs in {key}')
