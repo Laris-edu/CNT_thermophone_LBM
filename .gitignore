@@ -16,3 +16,7 @@ _work/
 # configs remain tracked so every case stays reproducible.
 Compute/**/raw/
 Compute/**/final/
+.obsidian/
+k-wave-toolbox-version-1.4.1/
+服务器环境.md
+AGENTS.md
