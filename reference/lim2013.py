@@ -42,6 +42,8 @@ __all__ = [
     "TABLE1_AIR",
     "TABLE1_ARGON",
     "LimGas",
+    "LimFrequencyResult",
+    "solve_lim2013_frequency",
     "gas_from_physical_params",
     "characteristic_roots",
     "exact_thermal_admittance",
@@ -51,6 +53,8 @@ __all__ = [
     "conductive_heat_flux_hat",
     "near_field_pressure_hat_from_flux",
     "exact_pressure_hat",
+    "acoustic_pressure_hat_exact",
+    "near_field_pressure_hat_approximate",
     "near_field_pressure_rms_exact",
     "near_field_pressure_rms_approximate",
     "rayleigh_distance_m",
@@ -284,6 +288,70 @@ def exact_pressure_hat(
     return d1 * C1 * cmath.exp(-sigma1 * x_m) + d2 * C2 * cmath.exp(-sigma2 * x_m)
 
 
+def acoustic_pressure_hat_exact(
+    f_hz: float,
+    T_s_hat: complex,
+    x_m: float,
+    *,
+    gas: LimGas = TABLE1_AIR,
+) -> complex:
+    """精确声分支 ``d2*C2*exp(-sigma2*x)``；其模 / sqrt(2) 为 Eq. (24)。
+
+    保留热耗散导致的声波衰减。它不含热分支，不能替代热层内的完整压力
+    ``exact_pressure_hat``，也没有有限面积的球面扩散因子。
+    """
+
+    if not math.isfinite(x_m) or x_m < 0.0:
+        raise ValueError("x must be finite and non-negative")
+    temperature = complex(T_s_hat)
+    if not (math.isfinite(temperature.real) and math.isfinite(temperature.imag)):
+        raise ValueError("T_s_hat must be finite")
+    sigma1, sigma2, d1, d2 = characteristic_roots(f_hz, gas)
+    C2 = d1 * sigma1 / (d1 * sigma1 - d2 * sigma2) * temperature
+    return d2 * C2 * cmath.exp(-sigma2 * x_m)
+
+
+def _validate_harmonic_film_inputs(
+    drive_areal_hat: complex, c_s_J_m2K: float, beta0_per_side_W_m2K: float
+) -> None:
+    drive = complex(drive_areal_hat)
+    if not (math.isfinite(drive.real) and math.isfinite(drive.imag)):
+        raise ValueError("drive_areal_hat must be finite")
+    if not math.isfinite(c_s_J_m2K) or c_s_J_m2K <= 0.0:
+        raise ValueError("c_s must be finite and positive")
+    if not math.isfinite(beta0_per_side_W_m2K) or beta0_per_side_W_m2K < 0.0:
+        raise ValueError("beta0 must be finite and non-negative")
+
+
+def near_field_pressure_hat_approximate(
+    f_hz: float,
+    drive_areal_hat: complex,
+    c_s_J_m2K: float,
+    x_m: float,
+    *,
+    beta0_per_side_W_m2K: float,
+    gas: LimGas = TABLE1_AIR,
+) -> complex:
+    """Eq. (21) 的近场复幅，推广到任意谐波面功率（W/m²）。
+
+    ``p_hat = (gamma-1)*q_hat/c0 * exp(-1j*omega*x/c0)``，q 取 Eq. (18)
+    的近似热导纳。对论文 ``P_in*(1-cos omega*t)``，传入 ``-P_in/s``；
+    正号由精确出射分支确定，不使用 Eq. (19) 末项的印刷负号。
+    近场薄热层外的平面波近似不含吸收，RMS 为 ``abs(p_hat)/sqrt(2)``。
+    """
+
+    if not math.isfinite(x_m) or x_m < 0.0:
+        raise ValueError("x must be finite and non-negative")
+    _validate_harmonic_film_inputs(drive_areal_hat, c_s_J_m2K, beta0_per_side_W_m2K)
+    T_s = film_temperature_hat(
+        f_hz, drive_areal_hat, c_s_J_m2K,
+        beta0_per_side_W_m2K=beta0_per_side_W_m2K, gas=gas, exact=False,
+    )
+    q_hat = conductive_heat_flux_hat(f_hz, T_s, gas=gas, exact=False)
+    phase = cmath.exp(-1j * 2.0 * math.pi * f_hz * x_m / gas.c0_m_s)
+    return near_field_pressure_hat_from_flux(q_hat, gas) * phase
+
+
 def near_field_pressure_rms_exact(
     f_hz: float,
     T_s_hat: complex,
@@ -291,7 +359,10 @@ def near_field_pressure_rms_exact(
     x_m: float = 0.0,
     gas: LimGas = TABLE1_AIR,
 ) -> float:
-    """精确近场 RMS 声压 ``|p_hat(x)|/sqrt(2)``（论文 Eq. 24 的同一量）。"""
+    """完整精确平面解的 RMS，含热分支与声分支。
+
+    Eq. (24) 仅含声分支；热层外才与此值趋同，见 ``acoustic_pressure_hat_exact``。
+    """
 
     return abs(exact_pressure_hat(f_hz, T_s_hat, x_m, gas=gas)) / math.sqrt(2.0)
 
@@ -366,3 +437,106 @@ def with_alpha_from_kappa(gas: LimGas) -> LimGas:
     """返回 ``alpha`` 改由 ``kappa/(rho0*cp)`` 导出的同一气体（消 Table 1 的 0.2 % 差异）。"""
 
     return replace(gas, alpha_m2_s=gas.alpha_consistent_m2_s)
+
+
+@dataclass(frozen=True)
+class LimFrequencyResult:
+    """同一谐波驱动的独立 Lim 参照；所有复幅均为 exp(+iωt) 的峰值。
+
+    ``planar_exact`` 为热+声平面解，``acoustic_exact`` 为 Eq. (24) 声分支，
+    ``near_approximate`` 为 Eq. (21)/(22)，``p_rms_far_Pa`` 仅为 Eq. (23)。
+    ``in_near_field`` 只检查 Rayleigh 几何区间，不是整体有效性判定。
+    """
+
+    f_hz: float
+    x_m: float
+    rayleigh_distance_m: float
+    delta_T_m: float
+    acoustic_decay_exponent: float
+    T_s_hat_exact_K: complex
+    q_one_sided_hat_exact_W_m2: complex
+    p_hat_planar_exact_Pa: complex
+    p_hat_acoustic_exact_Pa: complex
+    T_s_hat_approximate_K: complex
+    q_one_sided_hat_approximate_W_m2: complex
+    p_hat_near_approximate_Pa: complex
+    p_rms_far_Pa: float
+
+    @property
+    def p_rms_planar_exact_Pa(self) -> float:
+        return abs(self.p_hat_planar_exact_Pa) / math.sqrt(2.0)
+
+    @property
+    def p_rms_acoustic_exact_Pa(self) -> float:
+        return abs(self.p_hat_acoustic_exact_Pa) / math.sqrt(2.0)
+
+    @property
+    def p_rms_near_approximate_Pa(self) -> float:
+        return abs(self.p_hat_near_approximate_Pa) / math.sqrt(2.0)
+
+    @property
+    def in_near_field(self) -> bool:
+        return self.x_m <= self.rayleigh_distance_m
+
+
+def solve_lim2013_frequency(
+    f_hz: float,
+    drive_areal_hat: complex,
+    c_s_J_m2K: float,
+    *,
+    area_m2: float,
+    x_m: float,
+    beta0_per_side_W_m2K: float,
+    gas: LimGas = TABLE1_AIR,
+) -> LimFrequencyResult:
+    """一次求解近/远场公式与精确平面对照（SI，不推进 LBM）。
+
+    f_hz 是声频；drive_areal_hat 为投影膜面积口径的复面功率 W/m²，
+    area_m2 为单侧面积，beta0 为单侧热损，c_s 为膜本体面积热容。
+    对总功率 P_in*(1-cos ωt)，先用 ``-areal_drive_from_power(P_in, area_m2)``。
+    仅求 AC 响应；复驱动不包含平均功率，因而不推断 Eq. (15) 的 DC 温升。
+
+    所有近/远场表达式分别返回，不按距离拼接。Eq. (21)/(22) 要求薄热层、
+    热层外、x <= R0 且声吸收可忽略；Eq. (23) 用于中心轴 x > R0，
+    仅包含 R0/x 幅值外推，不提供额外远场相位或吸收修正。
+    acoustic_decay_exponent 为精确 Re(sigma2)*x；delta_T_m 为近似热层尺度。
+    所有输出均为线性小扰动响应；精确指上述线性方程的平面解，不构成有限尺寸
+    器件验证，结果不生成 validation_passed。精确特征根沿用现有算法，回归覆盖
+    10 Hz--1 MHz；微 Hz 量级存在浮点消减误差。
+    """
+
+    _validate_harmonic_film_inputs(drive_areal_hat, c_s_J_m2K, beta0_per_side_W_m2K)
+    if not math.isfinite(area_m2) or area_m2 <= 0.0:
+        raise ValueError("area must be finite and positive")
+    if not math.isfinite(x_m) or x_m <= 0.0:
+        raise ValueError("x must be finite and positive for the far-field formula")
+    T_exact = film_temperature_hat(
+        f_hz, drive_areal_hat, c_s_J_m2K,
+        beta0_per_side_W_m2K=beta0_per_side_W_m2K, gas=gas,
+    )
+    T_approximate = film_temperature_hat(
+        f_hz, drive_areal_hat, c_s_J_m2K,
+        beta0_per_side_W_m2K=beta0_per_side_W_m2K, gas=gas, exact=False,
+    )
+    return LimFrequencyResult(
+        f_hz=float(f_hz), x_m=float(x_m),
+        rayleigh_distance_m=rayleigh_distance_m(f_hz, area_m2, gas),
+        delta_T_m=math.sqrt(2.0 * gas.alpha_m2_s / (2.0 * math.pi * f_hz)),
+        acoustic_decay_exponent=characteristic_roots(f_hz, gas)[1].real * x_m,
+        T_s_hat_exact_K=T_exact,
+        q_one_sided_hat_exact_W_m2=conductive_heat_flux_hat(f_hz, T_exact, gas=gas),
+        p_hat_planar_exact_Pa=exact_pressure_hat(f_hz, T_exact, x_m, gas=gas),
+        p_hat_acoustic_exact_Pa=acoustic_pressure_hat_exact(f_hz, T_exact, x_m, gas=gas),
+        T_s_hat_approximate_K=T_approximate,
+        q_one_sided_hat_approximate_W_m2=conductive_heat_flux_hat(
+            f_hz, T_approximate, gas=gas, exact=False,
+        ),
+        p_hat_near_approximate_Pa=near_field_pressure_hat_approximate(
+            f_hz, drive_areal_hat, c_s_J_m2K, x_m,
+            beta0_per_side_W_m2K=beta0_per_side_W_m2K, gas=gas,
+        ),
+        p_rms_far_Pa=far_field_pressure_rms(
+            f_hz, abs(drive_areal_hat) * area_m2, area_m2, c_s_J_m2K, x_m,
+            beta0_per_side_W_m2K=beta0_per_side_W_m2K, gas=gas,
+        ),
+    )
