@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from config_io import load_config
-from core.two_level_planar_solver import TwoLevelPlanarOpenSolver
+from core.two_level_planar_solver import TwoLevelPlanarOpenSolver, _linear_explode
 from core.unit_mapping import local_transport_coefficients
 
 
@@ -46,9 +46,20 @@ def test_all_population_links_have_correct_cell_centered_transfer(monkeypatch, d
         for previous, actual in ((coarse_f, solver.coarse_solver.f), (coarse_g, solver.coarse_solver.g)):
             np.testing.assert_array_equal(actual[cy:, 0, direction], previous[:-cy, 0, direction])
     elif cy < 0:
-        for previous, actual in ((coarse_f, solver.fine_solver.f), (coarse_g, solver.fine_solver.g)):
-            np.testing.assert_array_equal(actual[2*cy:, 0, direction],
-                                          np.repeat(previous[:-cy, 0, direction], 2))
+        # Coarse centers at 1,3,5... and child centers at .5,1.5,2.5...
+        # have an affine donor profile, so the transported child values are
+        # known independently of the reconstruction stencil.
+        for previous, actual, factors in (
+                (coarse_f, solver.fine_solver.f,
+                 [1.00225, 1.00375, 1.00525, 1.00675, 1.00825, 1.00975]),
+                (coarse_g, solver.fine_solver.g,
+                 [1.003, 1.005, 1.007, 1.009, 1.011, 1.013])):
+            children = actual[2*cy:, 0, direction]
+            base = previous[0, 0, direction]/(1.003 if previous is coarse_f else 1.004)
+            np.testing.assert_allclose(children, base*np.asarray(factors[:-2*cy]),
+                                       rtol=8e-16, atol=0.)
+            np.testing.assert_allclose(children.reshape(-cy, 2).mean(axis=1),
+                                       previous[:-cy, 0, direction], rtol=4e-16, atol=0.)
     else:
         np.testing.assert_array_equal(solver.fine_solver.f[:, :, direction], fine_f[:, :, direction])
         np.testing.assert_array_equal(solver.coarse_solver.g[:, :, direction], coarse_g[:, :, direction])
@@ -71,6 +82,42 @@ def test_all_population_links_have_correct_cell_centered_transfer(monkeypatch, d
     # also stay fixed without relying on the solver's reported residual.
     np.testing.assert_allclose(new[1:3], old[1:3], rtol=0., atol=1e-18)
     np.testing.assert_allclose(solver.last_momentum_residual_kg_m_s, 0., atol=1e-18)
+
+
+@pytest.mark.parametrize('donors,expected', [
+    ([4., 4., 4., 4.], [4., 4., 4., 4., 4., 4.]),
+    ([4., 8., 20., 40.], [3., 5., 6., 10., 16., 24.]),
+    ([40., 20., 8., 4.], [45., 35., 24., 16., 10., 6.]),
+])
+def test_linear_explode_preserves_means_with_curved_and_decreasing_donors(donors, expected):
+    # Curvature distinguishes centered interior slopes from forward slopes;
+    # a decreasing profile catches a reversed child ordering.
+    parents = np.asarray(donors)[:, None]
+    children = _linear_explode(parents, 3)
+    np.testing.assert_array_equal(children[:, 0], expected)
+    np.testing.assert_array_equal(children.reshape(3, 2).mean(axis=1), parents[:3, 0])
+
+
+@pytest.mark.parametrize('distribution', ['f', 'g'])
+def test_nonpositive_linear_children_reject_macrostep_without_clipping(monkeypatch, distribution):
+    solver = TwoLevelPlanarOpenSolver(two_level_config())
+    solver.initialize_equilibrium()
+    direction = int(np.flatnonzero(solver.lattice.c[:, 1] == -1)[0])
+    # Positive coarse donors [a,9a] extrapolate a negative left child.
+    # The solver must reject this unresolved gradient, not clip the child.
+    populations = getattr(solver.coarse_solver, distribution)
+    populations[1, 0, direction] = 9*populations[0, 0, direction]
+    before = solver.checkpoint()
+    monkeypatch.setattr('core.two_level_planar_solver.collide_fg',
+        lambda f, g, *args, **kwargs: (f.copy(), g.copy()))
+    with pytest.raises(FloatingPointError, match='nonpositive'):
+        solver.step_temperature(300.)
+    for name, actual in (
+            ('fine_f', solver.fine_solver.f), ('fine_g', solver.fine_solver.g),
+            ('coarse_f', solver.coarse_solver.f), ('coarse_g', solver.coarse_solver.g)):
+        np.testing.assert_array_equal(actual, before[name])
+    assert solver.t_lu == solver.fine_solver.t_lu == solver.coarse_solver.t_lu == 0
+    assert solver.last_audit is None and solver.last_interface_audit is None
 
 
 def test_only_physical_cells_collide_and_time_ratios_are_exact(monkeypatch):

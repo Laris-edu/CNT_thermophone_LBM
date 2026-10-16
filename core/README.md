@@ -16,6 +16,14 @@
 | [unit_mapping.py](unit_mapping.py) | 单位与输运映射的唯一权威；旧配置的退役旋钮会被显式拒绝 |
 | [solver.py](solver.py) | `GasSolver2D`：collide → stream → boundary 三步链 |
 | [planar_open_solver.py](planar_open_solver.py) | `PlanarOpenSolver`：nx=1 单侧给温入口，法向不回绕；独立记录壁/出口质量与能量交换 |
+| [two_level_planar_solver.py](two_level_planar_solver.py) | `TwoLevelPlanarOpenSolver`：nx=1 固定 2∶1 空间／时间网格；保均值线性拆分、平均合并与同步交换审计 |
+
+两级入口 `step_temperature`／`step_wall_energy` 每次推进一个粗步和两个细步。
+粗到细使用碰撞后布居重构两个子单元：`F_left/right = F_coarse ∓ slope/4`，
+其中 slope 为粗格索引方向的梯度，接口首格用向前差分，其余发送格用中心差分。
+子单元均值保持原粗格布居；细到粗仍对实际流步后的影子布居成对平均。
+重构出现非有限或非正布居时显式报错，不裁剪、不提交该同步步。
+此空间重构不包含时间预测或非平衡矩跨层标定；离散守恒不代替局部热流和声学精度验证。
 
 开放平面验证使用 `step_temperature(T_midpoint_K)`，不调用旧膜 ODE。
 当前边界与适用范围见 [开放域报告](../docs/OPEN_PLANAR_20260918.md)。

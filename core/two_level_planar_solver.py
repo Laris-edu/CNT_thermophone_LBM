@@ -1,4 +1,4 @@
-"""Conservative 2:1 cell-centered merge/explode for an nx=1 open gas column.
+"""Conservative 2:1 cell-centered linear explode/mean merge for an open column.
 
 Both levels use the existing D2Q37 collision and local transport mapping. Six
 fine shadow rows carry populations only; they are neither collided nor physical
@@ -74,6 +74,24 @@ def _moments(f, g, lattice):
     momentum = sums @ lattice.c
     return np.array([np.sum(sums), momentum[0], momentum[1],
                      .5*np.dot(sums, c2)+np.sum(g)])
+
+
+def _linear_explode(values, count):
+    """Split the first ``count`` coarse donors into mean-preserving children.
+
+    Slopes are in coarse-cell index units: a forward difference at the
+    interface and centered differences inside the coarse block. Child centers
+    are +/- one quarter of a coarse width from the parent center. Only actual
+    coarse post-collision data are used; no temporal or non-equilibrium rescale
+    is performed here.
+    """
+    slope = np.empty_like(values[:count])
+    slope[0] = values[1]-values[0]
+    slope[1:] = .5*(values[2:count+1]-values[:count-1])
+    children = np.empty((2*count, *values.shape[1:]), dtype=values.dtype)
+    children[::2] = values[:count]-.25*slope
+    children[1::2] = values[:count]+.25*slope
+    return children
 
 
 class TwoLevelPlanarOpenSolver:
@@ -244,8 +262,11 @@ class TwoLevelPlanarOpenSolver:
         shadow_g = np.full_like(shadow_f, np.nan)
         for direction, cy in enumerate(self.lattice.c[:, 1].astype(int)):
             if cy < 0:
-                shadow_f[:-2*cy, :, direction] = np.repeat(cp[:-cy, :, direction], 2, axis=0)
-                shadow_g[:-2*cy, :, direction] = np.repeat(cq[:-cy, :, direction], 2, axis=0)
+                children_f = _linear_explode(cp[:, :, direction], -cy)
+                children_g = _linear_explode(cq[:, :, direction], -cy)
+                self._check_physical(children_f, children_g)
+                shadow_f[:-2*cy, :, direction] = children_f
+                shadow_g[:-2*cy, :, direction] = children_g
         interface_fine, walls = np.zeros(4), np.zeros(4)
         substeps = []
         for substep in range(2):
