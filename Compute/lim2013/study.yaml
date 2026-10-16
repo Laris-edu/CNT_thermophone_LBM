@@ -1,0 +1,28 @@
+source_table: ../../工况参考表.md
+source_condition: E1
+frequency_Hz: 20000.0
+distances_m: [0.006, 0.008, 0.015, 0.040, 0.045]
+area_m2: 0.0009
+power_W: 1.13
+drive: P_in * (1 - cos(omega*t))
+c_s_J_m2K: 0.012888
+film_heat_capacity_basis:
+  source: User-supplied rho_f * cp_f * h_f; absent from the parameter table.
+  rho_f_kg_m3: 1.0
+  cp_f_J_kgK: 716.0
+  h_f_m: 0.000018
+beta0_per_side_W_m2K: 28.9
+pressure_reference_Pa: 0.00002
+gas:
+  rho0_kg_m3: 1.16
+  cp_J_kgK: 1007.0
+  kappa_W_mK: 0.0263
+  c0_m_s: 347.0
+  alpha_m2_s: 0.000022
+  gamma: 1.4
+  p0_Pa: 101000.0
+  T0_K: 300.0
+assumptions:
+  frequency: 20 kHz is the acoustic / heating frequency.
+  gamma: The table does not specify gamma; use the public air model value 1.4.
+  SPL: 20*log10(p_rms / 20e-6 Pa), with no extra peak-to-RMS correction.
